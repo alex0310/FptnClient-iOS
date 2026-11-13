@@ -21,12 +21,14 @@
 - [x] `FPTNClient`, `FPTNRelay`.
 - [x] iOS SwiftUI app с темами Aurora/Ember.
 - [x] NetworkExtension skeleton.
-- [x] Linux tests: 445 (358 core + 87 shared), 0 падений, 0 warnings.
+- [x] Linux tests: 459 (358 core + 101 shared), 0 падений, 0 warnings.
 - [x] Linux live probe: login/DNS/tunnel/DNS через туннель, plain/obfuscated/reality.
 - [x] Проверить на реальном FPTN-сервере все три режима маскировки (`Tools/LiveProbe`).
 - [x] Публичный репозиторий `alex0310/FptnClient-iOS` и CI на GitHub Actions (Ubuntu + macOS-раннер).
 - [x] Метрики трафика из extension в app: байты/пакеты RX-TX и скорость в Diagnostics.
 - [x] Живой график скоростей RX/TX за 60 секунд в Diagnostics (темы Aurora/Ember).
+- [x] Golden snapshot-тесты токенов обеих тем + WCAG-контраст на Linux.
+- [x] Xcode UI-тесты рендеринга `ThemeSwatch` и `TrafficChartView` для Aurora/Ember.
 - [x] Swift 6 language mode для всего пакета: 0 warnings, все тесты проходят.
 
 ## Следующие шаги
@@ -34,8 +36,9 @@
 - [x] Собрать iOS app и extension на macOS (GitHub Actions, `macos-15`, Xcode 16.4).
 - [ ] Проверить на устройстве: Keychain, On-Demand, обязательные CIDR,
   динамические host-маршруты и гонку «DNS-ответ → первое подключение».
-- [ ] Проверить метрики трафика в живом туннеле на устройстве.
-- [ ] UI-тесты и snapshot-тесты тем.
+- [ ] Проверить метрики трафика и график в живом туннеле на устройстве.
+- [ ] Пиксельные эталонные PNG для UI-тестов (сейчас проверяется факт рендеринга
+  и различие тем, но не точное совпадение с эталоном).
 
 ## Открытые вопросы
 

@@ -50,3 +50,17 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
+      - name: List available simulators
+        run: xcrun simctl list devices available
+      - name: Run theme UI tests
+        run: |
+          xcodebuild \
+            -project FptnClient.xcodeproj \
+            -scheme FptnClient \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test

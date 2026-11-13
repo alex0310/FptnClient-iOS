@@ -1,0 +1,12 @@
+theme ember
+backgroundTop 0.100,0.075,0.065,1.000
+backgroundBottom 0.035,0.030,0.030,1.000
+surface 1.000,1.000,1.000,0.060
+surfaceStrong 1.000,1.000,1.000,0.110
+accent 1.000,0.620,0.280,1.000
+accentSecondary 0.940,0.310,0.240,1.000
+textPrimary 1.000,0.960,0.910,1.000
+textSecondary 0.680,0.600,0.540,1.000
+success 0.490,0.900,0.580,1.000
+warning 1.000,0.780,0.320,1.000
+danger 1.000,0.400,0.380,1.000

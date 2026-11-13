@@ -71,11 +71,28 @@ targets:
         APPLICATION_EXTENSION_API_ONLY: YES
         TARGETED_DEVICE_FAMILY: "1,2"
 
+  FptnClientTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/FptnClientTests
+    dependencies:
+      - target: FptnClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.fptnclient.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+
 schemes:
   FptnClient:
     build:
       targets:
         FptnClient: all
+    test:
+      config: Debug
+      targets:
+        - FptnClientTests
     run:
       config: Debug
     archive:

@@ -4,7 +4,9 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 445 тестов (358 + 87), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 459 тестов (358 + 101), 0 падений |
+| Токены тем | Linux, golden files | 2 эталона, 0 расхождений |
+| UI-рендеринг тем | `macos-15`, iOS Simulator, `xcodebuild test` | см. CI |
 | `FptnCore` warnings | Linux, `-Xswiftc -warnings-as-errors` | 0 |
 | `swift build` / `swiftc -parse App/ Tunnel/` | Linux | 0 warnings, 0 errors |
 | `Tools/LiveProbe` | Linux, Swift 6 mode ядра | сборка без ошибок |
@@ -20,7 +22,30 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 358 tests` для `FptnCore` и `Executed 87 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+Последний прогон: `Executed 358 tests` для `FptnCore` и `Executed 101 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+
+## Тесты тем
+
+Дизайн-токены вынесены в `FptnShared` (`ThemeTokens`, `ThemeColor`, `AppTheme`),
+а `ThemePalette` в app-таргете стал тонким адаптером `ThemeColor → SwiftUI.Color`
+без единого цветового литерала. Это позволяет тестировать темы на Linux.
+
+- **Golden snapshots:** `Tests/FptnSharedTests/Snapshots/aurora.theme` и
+  `ember.theme` — стабильный дамп всех 11 цветов с точностью до 3 знаков.
+  `ThemeSnapshotTests` сравнивает сгенерированный дамп с эталоном; эталоны
+  тестами не перезаписываются, поэтому любое изменение палитры падает в CI.
+- **Доступность:** `ThemeContrast` считает WCAG-контраст; тесты требуют ≥ 4.5
+  для основного текста и ≥ 3.0 для второстепенного на обоих фонах темы.
+- **Прочее:** уникальность тем, диапазон 0…1 у всех компонентов, fallback
+  `AppTheme(stored:)`, локализация названий/подписей в `en` и `ru`,
+  детерминированность дампа.
+- **Guard-тесты:** `App/` не содержит `Color(red:...)`, палитра строится из
+  `ThemeTokens`, `project.yml`/CI содержат UI-тестовый таргет и `xcodebuild test`.
+- **Xcode UI-тесты:** `Tests/FptnClientTests/ThemeRenderingTests.swift` через
+  `ImageRenderer` рендерит `ThemeSwatch` и `TrafficChartView` для обеих тем,
+  проверяет непустой PNG и то, что Aurora и Ember дают разные изображения.
+  Пиксельные эталоны PNG пока не хранятся — шрифты и SF Symbols зависят от
+  рантайма симулятора, поэтому сравнивается факт и различие рендеринга.
 
 ## Swift 6 language mode
 
@@ -83,8 +108,9 @@ Swift 6.4.2: локальная константа `descriptor` в `POSIXSocketT
 
 - `core` (`ubuntu-24.04`, Swift 6.2): `swift build -Xswiftc -warnings-as-errors`,
   `swift test`, `swiftc -parse App/*.swift App/*/*.swift Tunnel/*.swift`;
-- `ios-build` (`macos-15`): `xcodegen generate` и `xcodebuild ... build`
-  с `CODE_SIGNING_ALLOWED=NO` для app и extension.
+- `ios-build` (`macos-15`): `xcodegen generate`, `xcodebuild ... build`
+  с `CODE_SIGNING_ALLOWED=NO` для app и extension, затем `xcodebuild ... test`
+  на iOS Simulator для таргета `FptnClientTests`.
 
 `ubuntu-latest` в 2026 указывает на Ubuntu 26.04, которую
 `swift-actions/setup-swift@v2` не поддерживает, поэтому job закреплён за
@@ -163,6 +189,10 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   геометрия (пусто, x 0…1, масштабирование y, clamp, некорректный scale).
 - `TrafficIntegrationTests`: исходники `App/`/`Tunnel/` обязаны содержать
   хуки записи, чтения, истории и отображения метрик/графика.
+- `ThemeSnapshotTests`: golden-файлы обеих тем, полнота дампа, уникальность,
+  диапазон компонентов, fallback, RU/EN названия, WCAG-контраст.
+- `ThemeIntegrationTests`: палитра-адаптер без цветовых литералов, отсутствие
+  хардкодных цветов во views, наличие UI-таргета и CI-шага.
 - `PackageManifestTests`: `swiftLanguageModes: [.v6]` не откатывается.
 - `SharedSettings` Codable/legacy decode, bundled 2158-domain list, import parsing/merge.
 - `OnDemandPolicy` automatic/manual rule descriptors.
@@ -180,7 +210,8 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
 - Type-check `App/` и `Tunnel/` теперь выполняет macOS-CI; на Linux по-прежнему
   доступен только `swiftc -parse`. Запуск на устройстве не проверялся.
 - `Tools/LiveProbe` не входит в unit-тесты и требует реальный токен/сеть.
-- Переключение языка в живом UI проверяется только на macOS/iOS; Linux-тесты проверяют словари и `Localizer`.
+- Переключение языка и тем в живом UI проверяется только на macOS/iOS; Linux-тесты проверяют словари, `Localizer` и токены, а Xcode-тесты — факт рендеринга.
+- Пиксельное совпадение UI с эталонными PNG (сейчас проверяется только непустой рендер и различие тем).
 - Все 19 серверов и длительная работа pool под нагрузкой; live-прогон покрывает по одному серверу на режим.
 - iOS route installation и `NEPacketTunnelFlow` на устройстве.
 - Метрики трафика и график в живом туннеле: запись снимков из extension,

@@ -36,7 +36,8 @@ let package = Package(
         .testTarget(
             name: "FptnSharedTests",
             dependencies: ["FptnShared"],
-            path: "Tests/FptnSharedTests"
+            path: "Tests/FptnSharedTests",
+            resources: [.copy("Snapshots")]
         )
     ],
     // Verified clean under Swift 6 language mode (0 warnings, 403 tests).

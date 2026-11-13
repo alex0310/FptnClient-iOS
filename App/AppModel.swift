@@ -72,7 +72,7 @@ final class AppModel: ObservableObject {
         AppTheme(stored: settings.theme)
     }
 
-    var palette: ThemePalette { theme.palette }
+    var palette: ThemePalette { ThemePalette(theme.tokens) }
 
     var l10n: Localizer { Localizer(language: settings.language) }
 

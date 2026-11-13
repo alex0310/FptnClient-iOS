@@ -126,7 +126,7 @@ struct ThemeSwatch: View {
     let localizer: Localizer
 
     var body: some View {
-        let palette = theme.palette
+        let palette = ThemePalette(theme.tokens)
         VStack(alignment: .leading, spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
