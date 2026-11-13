@@ -72,6 +72,14 @@ struct DiagnosticsView: View {
             .listRowBackground(palette.surface)
 
             Section {
+                TrafficChartView(
+                    history: model.trafficHistory,
+                    palette: palette,
+                    l10n: model.l10n
+                )
+                .listRowInsets(
+                    EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
+                )
                 if let traffic = model.traffic {
                     InfoRow(
                         label: model.l10n.text(.diagnosticsTrafficReceived),

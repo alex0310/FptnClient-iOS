@@ -113,6 +113,10 @@
 "diagnostics.traffic.downSpeed" = "Download speed";
 "diagnostics.traffic.upSpeed" = "Upload speed";
 "diagnostics.traffic.noData" = "No traffic data yet";
+"diagnostics.traffic.chartTitle" = "Speed - last 60 s";
+"diagnostics.traffic.chartRx" = "Download";
+"diagnostics.traffic.chartTx" = "Upload";
+"diagnostics.traffic.chartEmpty" = "Collecting data...";
 
 "split.title" = "Split tunnel";
 "split.domainRules" = "DOMAIN RULES";

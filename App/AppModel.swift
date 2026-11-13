@@ -16,6 +16,7 @@ final class AppModel: ObservableObject {
     @Published var isBusy = false
     @Published private(set) var traffic: TrafficSnapshot?
     @Published private(set) var trafficSpeed: TrafficSpeed?
+    @Published private(set) var trafficHistory = TrafficHistory()
 
     private let vpn = VPNController()
     private let tokenStore: any TokenStore
@@ -219,6 +220,7 @@ final class AppModel: ObservableObject {
             previousTraffic = nil
             traffic = nil
             trafficSpeed = nil
+            trafficHistory.reset()
             return
         }
         guard trafficTimer == nil else { return }
@@ -235,10 +237,19 @@ final class AppModel: ObservableObject {
             previousTraffic = nil
             traffic = nil
             trafficSpeed = nil
+            trafficHistory.reset()
             return
         }
-        if let previous = previousTraffic {
-            trafficSpeed = current.speed(relativeTo: previous)
+        if let previous = previousTraffic,
+           let speed = current.speed(relativeTo: previous) {
+            trafficSpeed = speed
+            trafficHistory.append(
+                TrafficSample(
+                    timestamp: current.updatedAt,
+                    rxBytesPerSecond: speed.rxBytesPerSecond,
+                    txBytesPerSecond: speed.txBytesPerSecond
+                )
+            )
         } else {
             trafficSpeed = nil
         }

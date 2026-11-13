@@ -4,7 +4,7 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 429 тестов (358 + 71), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 445 тестов (358 + 87), 0 падений |
 | `FptnCore` warnings | Linux, `-Xswiftc -warnings-as-errors` | 0 |
 | `swift build` / `swiftc -parse App/ Tunnel/` | Linux | 0 warnings, 0 errors |
 | `Tools/LiveProbe` | Linux, Swift 6 mode ядра | сборка без ошибок |
@@ -20,7 +20,7 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 358 tests` для `FptnCore` и `Executed 71 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+Последний прогон: `Executed 358 tests` для `FptnCore` и `Executed 87 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
 
 ## Swift 6 language mode
 
@@ -64,9 +64,16 @@ Swift 6.4.2: локальная константа `descriptor` в `POSIXSocketT
 - `AppModel` раз в секунду читает снимок, вычисляет `TrafficSpeed` по двум
   соседним точкам и публикует `@Published`-поля. Новая секция Diagnostics
   показывает RX/TX байты, пакеты и скорости; подписи локализованы RU/EN.
-- Формат по умолчанию — суммарные байты + пакеты + текущая скорость; график
-  пока не реализован (открытый вопрос в `PLAN.md`).
-- На устройстве метрики ещё не проверялись.
+- График: `TrafficHistory` — кольцевой буфер на 60 сэмплов в процессе app;
+  `TrafficChartScale` округляет потолок оси Y до 1/2/5×10ⁿ (минимум 1 KiB/s,
+  чтобы график не дёргался на простое); `TrafficChartGeometry` переводит
+  сэмплы в нормализованные координаты 0…1. `TrafficChartView` — тонкий
+  SwiftUI-слой: сетка, две линии RX/TX, градиентная заливка под RX, легенда,
+  заголовок с потолком шкалы, всё в цветах `ThemePalette`. При менее чем двух
+  точках показывается заглушка «Собираем данные…».
+- История живёт только в app и сбрасывается при отключении/перезапуске;
+  в App Group она не пишется.
+- На устройстве метрики и график ещё не проверялись.
 
 ## CI на GitHub Actions
 
@@ -150,8 +157,11 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   `TrafficSnapshot.speed` (смена сессии, обратное время, сброс счётчиков),
   `TrafficFormatter` (бинарные единицы, некорректные значения),
   `TrafficSnapshotStore` (round-trip, битые данные, clear).
+- `TrafficChartTests`: кольцевой буфер (порядок, вытеснение, минимальный лимит,
+  reset), `niceCeiling`/`peak`/`scale` (включая NaN/inf/отрицательные),
+  геометрия (пусто, x 0…1, масштабирование y, clamp, некорректный scale).
 - `TrafficIntegrationTests`: исходники `App/`/`Tunnel/` обязаны содержать
-  хуки записи, чтения и отображения метрик.
+  хуки записи, чтения, истории и отображения метрик/графика.
 - `PackageManifestTests`: `swiftLanguageModes: [.v6]` не откатывается.
 - `SharedSettings` Codable/legacy decode, bundled 2158-domain list, import parsing/merge.
 - `OnDemandPolicy` automatic/manual rule descriptors.
@@ -172,8 +182,9 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
 - Переключение языка в живом UI проверяется только на macOS/iOS; Linux-тесты проверяют словари и `Localizer`.
 - Все 19 серверов и длительная работа pool под нагрузкой; live-прогон покрывает по одному серверу на режим.
 - iOS route installation и `NEPacketTunnelFlow` на устройстве.
-- Метрики трафика в живом туннеле: запись снимков из extension, чтение в app,
-  корректность скоростей при смене сети и реконнекте.
+- Метрики трафика и график в живом туннеле: запись снимков из extension,
+  чтение в app, корректность скоростей при смене сети и реконнекте,
+  отрисовка `Path` на устройстве/симуляторе.
 - Динамическое обновление `excludedRoutes` через `setTunnelNetworkSettings` во
   время работы туннеля и гонка «DNS-ответ → первое подключение».
 - Доменные правила при DoH/DoT: такие DNS-ответы не видны extension.

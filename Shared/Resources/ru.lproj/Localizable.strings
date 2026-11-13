@@ -113,6 +113,10 @@
 "diagnostics.traffic.downSpeed" = "Скорость загрузки";
 "diagnostics.traffic.upSpeed" = "Скорость отдачи";
 "diagnostics.traffic.noData" = "Данных о трафике пока нет";
+"diagnostics.traffic.chartTitle" = "Скорость - 60 с";
+"diagnostics.traffic.chartRx" = "Загрузка";
+"diagnostics.traffic.chartTx" = "Отдача";
+"diagnostics.traffic.chartEmpty" = "Собираем данные...";
 
 "split.title" = "Split-туннель";
 "split.domainRules" = "ДОМЕННЫЕ ПРАВИЛА";

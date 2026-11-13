@@ -147,6 +147,10 @@ public enum L10nKey: String, CaseIterable, Sendable {
     case diagnosticsTrafficDownSpeed = "diagnostics.traffic.downSpeed"
     case diagnosticsTrafficUpSpeed = "diagnostics.traffic.upSpeed"
     case diagnosticsTrafficNoData = "diagnostics.traffic.noData"
+    case diagnosticsTrafficChartTitle = "diagnostics.traffic.chartTitle"
+    case diagnosticsTrafficChartRX = "diagnostics.traffic.chartRx"
+    case diagnosticsTrafficChartTX = "diagnostics.traffic.chartTx"
+    case diagnosticsTrafficChartEmpty = "diagnostics.traffic.chartEmpty"
 
     case splitTitle = "split.title"
     case splitDomainRules = "split.domainRules"
