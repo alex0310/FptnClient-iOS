@@ -63,9 +63,12 @@ final class POSIXSocketTests: XCTestCase {
             port = UInt16(bigEndian: bound.sin_port)
             // `Thread`'s closure is @Sendable: capture only value types so the
             // helper needs no @unchecked Sendable conformance in Swift 6 mode.
-            let descriptor = self.descriptor
+            // The local name is deliberately distinct from the `descriptor`
+            // property: Swift 6.2 otherwise resolves the earlier `bind`/
+            // `getsockname` closures to this later declaration.
+            let listenDescriptor = self.descriptor
             let thread = Thread {
-                echoServerLoop(descriptor: descriptor, echo: echo)
+                echoServerLoop(descriptor: listenDescriptor, echo: echo)
             }
             self.thread = thread
             thread.start()
