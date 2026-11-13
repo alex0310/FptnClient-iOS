@@ -218,6 +218,11 @@ final class FPTNRelayTests: XCTestCase {
 
     // MARK: - Traffic accounting
 
+    func testRelayIsSendableForCrossQueueUse() {
+        func requireSendable<T: Sendable>(_ value: T) {}
+        requireSendable(FPTNRelay(sender: RelaySender(), sink: RelaySink()))
+    }
+
     func testTrafficCallbacksCountForwardedBytesAndPackets() throws {
         var outbound = (bytes: 0, packets: 0)
         let relay = FPTNRelay(

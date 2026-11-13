@@ -14,7 +14,12 @@ extension FPTNClient: PacketSender {}
 /// The platform-independent half of the relay loop. The iOS extension supplies
 /// `NEPacketTunnelFlow` as the sink and `FPTNClient` as the sender; Linux tests
 /// supply in-memory doubles.
-public final class FPTNRelay {
+///
+/// The relay is shared between the control queue and one reader queue per pool
+/// slot. Every stored property is immutable; `SplitTunnel` is a value type and
+/// `SplitTunnelRouteStore` synchronizes its own state, so sharing is safe even
+/// though the injected `PacketSender`/`PacketSink` are not `Sendable` protocols.
+public final class FPTNRelay: @unchecked Sendable {
     private let sender: PacketSender
     private let sink: PacketSink
     private let splitTunnel: SplitTunnel?
