@@ -38,7 +38,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             token: token
         )
         self.runtime = runtime
-        runtime.start(completionHandler: completionHandler)
+        runtime.start(completion: completionHandler)
     }
 
     override func stopTunnel(
