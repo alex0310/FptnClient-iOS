@@ -6,7 +6,7 @@
 |---|---|---|
 | `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 459 тестов (358 + 101), 0 падений |
 | Токены тем | Linux, golden files | 2 эталона, 0 расхождений |
-| UI-рендеринг тем | `macos-15`, iOS Simulator, `xcodebuild test` | см. CI |
+| UI-рендеринг тем | `macos-15`, iPhone 16 / iOS 26.2, `xcodebuild test` | 4 теста, 0 падений |
 | `FptnCore` warnings | Linux, `-Xswiftc -warnings-as-errors` | 0 |
 | `swift build` / `swiftc -parse App/ Tunnel/` | Linux | 0 warnings, 0 errors |
 | `Tools/LiveProbe` | Linux, Swift 6 mode ядра | сборка без ошибок |
@@ -46,6 +46,8 @@
   проверяет непустой PNG и то, что Aurora и Ember дают разные изображения.
   Пиксельные эталоны PNG пока не хранятся — шрифты и SF Symbols зависят от
   рантайма симулятора, поэтому сравнивается факт и различие рендеринга.
+  Прогон на `iPhone 16` / iOS 26.2: `Executed 4 tests, with 0 failures`,
+  `** TEST SUCCEEDED **`.
 
 ## Swift 6 language mode
 
@@ -128,12 +130,13 @@ macOS-CI нашёл две ошибки, которые невозможно у�
    `TunnelRuntime.start` принимает `completion:`, а не `completionHandler:`.
    Регрессию проверяет `TunnelCallSiteTests`.
 
-Итоговый прогон (commit `0b81ba0`): оба job — `success`, **0 Swift-warning и
+Итоговый прогон (commit `de2a5bc`): оба job — `success`, **0 Swift-warning и
 0 Swift-error** в обоих логах; macOS-job подтвердил type-check
-`TrafficChartView`. Остаются только сторонние предупреждения инструментов:
-`gpg` при установке Swift, `appintentsmetadataprocessor` Xcode (нет зависимости
-от `AppIntents.framework`) и уведомление runner о Node.js 20.
-Прогон: https://github.com/alex0310/FptnClient-iOS/actions/runs/43451512308
+`TrafficChartView` и выполнил 4 UI-теста рендеринга тем. Остаются только
+сторонние предупреждения инструментов: `gpg` при установке Swift,
+`appintentsmetadataprocessor` Xcode (нет зависимости от `AppIntents.framework`)
+и уведомление runner о Node.js 20.
+Прогон: https://github.com/alex0310/FptnClient-iOS/actions/runs/43465802644
 
 ## Живая проверка FPTN
 
