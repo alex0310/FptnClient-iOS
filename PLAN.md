@@ -21,10 +21,10 @@
 - [x] `FPTNClient`, `FPTNRelay`.
 - [x] iOS SwiftUI app с темами Aurora/Ember.
 - [x] NetworkExtension skeleton.
-- [x] Linux tests: 401 (352 core + 49 shared), 0 падений, 0 warnings.
+- [x] Linux tests: 402 (352 core + 50 shared), 0 падений, 0 warnings.
 - [x] Linux live probe: login/DNS/tunnel/DNS через туннель, plain/obfuscated/reality.
 - [x] Проверить на реальном FPTN-сервере все три режима маскировки (`Tools/LiveProbe`).
-- [x] CI macOS job для сборки без подписи.
+- [x] Публичный репозиторий `alex0310/FptnClient-iOS` и CI на GitHub Actions (Ubuntu + macOS-раннер).
 
 ## Следующие шаги
 

@@ -127,8 +127,8 @@ final class TunnelRuntime {
     // MARK: - Network settings
 
     private func applyNetworkSettings(
-        ipv4: IPAddress,
-        ipv6: IPAddress?,
+        ipv4: FptnCore.IPAddress,
+        ipv6: FptnCore.IPAddress?,
         dns: FPTNDNSSettings,
         remote: String
     ) throws {
@@ -210,7 +210,7 @@ final class TunnelRuntime {
             guard let prefix = IPPrefix(value),
                   case let .ipv4(address) = prefix.address else { continue }
             let network = Self.maskedIPv4(address, prefixLength: prefix.prefixLength)
-            let destination = IPAddress.ipv4(network).text
+            let destination = FptnCore.IPAddress.ipv4(network).text
             let key = "\(destination)/\(prefix.prefixLength)"
             guard seen.insert(key).inserted else { continue }
             routes.append(

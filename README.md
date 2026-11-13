@@ -1,5 +1,7 @@
 # FPTN iOS
 
+[![CI](https://github.com/alex0310/FptnClient-iOS/actions/workflows/ci.yml/badge.svg)](https://github.com/alex0310/FptnClient-iOS/actions/workflows/ci.yml)
+
 Независимый Swift-клиент FPTN для iOS: собственный TLS 1.3, YAFF/WebSocket,
 rolling pool из двух или трёх туннелей, split tunnel и оригинальный SwiftUI-интерфейс
 с двумя темами оформления.

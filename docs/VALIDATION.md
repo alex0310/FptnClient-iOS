@@ -4,10 +4,13 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2 | 401 тест (352 + 49), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2 | 402 теста (352 + 50), 0 падений |
 | `FptnCore` warnings | Linux | 0 |
-| iOS app | macOS/Xcode | не проверено в этой среде |
-| NetworkExtension | macOS/Xcode | не проверено в этой среде |
+| `swift build` / `swiftc -parse App/ Tunnel/` | Linux | 0 warnings, 0 errors |
+| CI `core` | GitHub Actions, `ubuntu-24.04`, Swift 6.2 | запускается при каждом push |
+| CI `ios-build` | GitHub Actions, `macos-15`, Xcode 16.4 | сборка без подписи |
+| iOS app | macOS/Xcode | компилируется в CI, на устройстве не проверялось |
+| NetworkExtension | macOS/Xcode | компилируется в CI, на устройстве не проверялось |
 | Живой FPTN-сервер | Linux, `Tools/LiveProbe` | login, DNS API, tunnel, DNS-запрос: OK |
 
 Команда:
@@ -16,7 +19,29 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 352 tests` для `FptnCore` и `Executed 49 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors.
+Последний прогон: `Executed 352 tests` для `FptnCore` и `Executed 50 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors.
+
+## CI на GitHub Actions
+
+Репозиторий: `https://github.com/alex0310/FptnClient-iOS`. Workflow
+`.github/workflows/ci.yml` запускается на `push`/`pull_request` в `main` и через
+`workflow_dispatch`:
+
+- `core` (`ubuntu-24.04`, Swift 6.2): `swift build`, `swift test`,
+  `swiftc -parse App/*.swift App/*/*.swift Tunnel/*.swift`;
+- `ios-build` (`macos-15`): `xcodegen generate` и `xcodebuild ... build`
+  с `CODE_SIGNING_ALLOWED=NO` для app и extension.
+
+`ubuntu-latest` в 2026 указывает на Ubuntu 26.04, которую
+`swift-actions/setup-swift@v2` не поддерживает, поэтому job закреплён за
+`ubuntu-24.04`. Swift закреплён за 6.2, так как `swift-asn1` в
+`Package.resolved` использует `swift-tools-version:6.1`.
+
+Первый прогон macOS-CI нашёл ошибку, которую нельзя увидеть на Linux:
+`'IPAddress' is ambiguous for type lookup` в `Tunnel/TunnelRuntime.swift`
+(`NetworkExtension` тянет системный модуль с одноимённым типом). Все обращения
+к `IPAddress` в `App/` и `Tunnel/` теперь пишутся как `FptnCore.IPAddress`;
+регрессию проверяет `TunnelSourceQualificationTests`.
 
 ## Живая проверка FPTN
 
@@ -67,10 +92,13 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
 - `TokenStore`: UserDefaults fallback, keychain update/add/delete fallback, trimming,
   malformed UTF-8, mapping ошибок, миграция legacy-токена и удаление токена из
   settings blob.
+- `TunnelSourceQualificationTests`: все обращения к `IPAddress` в `App/` и
+  `Tunnel/` обязаны быть записаны как `FptnCore.IPAddress`.
 
 ## Что не покрыто
 
-- `App/` SwiftUI и `Tunnel/` NetworkExtension: требуют macOS/Xcode.
+- Type-check `App/` и `Tunnel/` теперь выполняет macOS-CI; на Linux по-прежнему
+  доступен только `swiftc -parse`. Запуск на устройстве не проверялся.
 - `Tools/LiveProbe` не входит в unit-тесты и требует реальный токен/сеть.
 - Переключение языка в живом UI проверяется только на macOS/iOS; Linux-тесты проверяют словари и `Localizer`.
 - Все 19 серверов и длительная работа pool под нагрузкой; live-прогон покрывает по одному серверу на режим.
