@@ -95,6 +95,12 @@ open FptnClient.xcodeproj
   и поле `token` в профиле.
 - NetworkExtension: `NEPacketTunnelProvider`, TUN ↔ WebSocket relay,
   установка маршрутов и DNS.
+- Метрики трафика: extension считает RX/TX байты и пакеты после split-фильтрации
+  и раз в секунду публикует снимок в App Group; Diagnostics показывает суммы,
+  пакеты и текущие скорости. RU/EN подписи, новый `sessionID` на каждое
+  подключение.
+- Весь Swift-пакет собирается в **Swift 6 language mode** без предупреждений;
+  428 unit-тестов проходят на Linux.
 
 ## Ограничения
 
@@ -102,7 +108,8 @@ open FptnClient.xcodeproj
   iOS-часть собирается и проходит type-check в GitHub Actions на `macos-15`.
   Запуск на реальном устройстве не выполнялся.
 - Live-проверка транспорта выполнена через `Tools/LiveProbe`; поведение
-  NetworkExtension, маршрутов и On-Demand на устройстве ещё не проверено.
+  NetworkExtension, маршрутов, On-Demand и метрик трафика на устройстве ещё не
+  проверено. Графика трафика нет — только байты, пакеты и скорость.
 - В токене нет отдельного поля «режим маскировки»; режим выбирается в настройках.
 - On-Demand использует правило «connect for any interface». Если выключить
   туннель вручную, но оставить On-Demand включённым, iOS может снова поднять его

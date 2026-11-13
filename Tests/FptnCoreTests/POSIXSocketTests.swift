@@ -61,8 +61,11 @@ final class POSIXSocketTests: XCTestCase {
                 throw TransportError.ioError(errno)
             }
             port = UInt16(bigEndian: bound.sin_port)
-            let thread = Thread { [weak self] in
-                self?.run(echo: echo)
+            // `Thread`'s closure is @Sendable: capture only value types so the
+            // helper needs no @unchecked Sendable conformance in Swift 6 mode.
+            let descriptor = self.descriptor
+            let thread = Thread {
+                echoServerLoop(descriptor: descriptor, echo: echo)
             }
             self.thread = thread
             thread.start()
@@ -74,32 +77,6 @@ final class POSIXSocketTests: XCTestCase {
 
         func stopListening() {
             _ = testClose(descriptor)
-        }
-
-        private func run(echo: Bool) {
-            let client = accept(descriptor, nil, nil)
-            guard client >= 0 else { return }
-            defer { _ = testClose(client) }
-            var buffer = [UInt8](repeating: 0, count: 4096)
-            while true {
-                let count = recv(client, &buffer, buffer.count, 0)
-                if count <= 0 { return }
-                if echo {
-                    var offset = 0
-                    while offset < count {
-                        let sent = buffer.withUnsafeBytes { raw -> Int in
-                            send(
-                                client,
-                                raw.baseAddress!.advanced(by: offset),
-                                count - offset,
-                                0
-                            )
-                        }
-                        if sent <= 0 { return }
-                        offset += sent
-                    }
-                }
-            }
         }
     }
 
@@ -151,6 +128,32 @@ final class POSIXSocketTests: XCTestCase {
             XCTAssertEqual(error as? TransportError, .resolveFailed(
                 "this-host-does-not-exist.invalid"
             ))
+        }
+    }
+}
+
+private func echoServerLoop(descriptor: Int32, echo: Bool) {
+    let client = accept(descriptor, nil, nil)
+    guard client >= 0 else { return }
+    defer { _ = testClose(client) }
+    var buffer = [UInt8](repeating: 0, count: 4096)
+    while true {
+        let count = recv(client, &buffer, buffer.count, 0)
+        if count <= 0 { return }
+        if echo {
+            var offset = 0
+            while offset < count {
+                let sent = buffer.withUnsafeBytes { raw -> Int in
+                    send(
+                        client,
+                        raw.baseAddress!.advanced(by: offset),
+                        count - offset,
+                        0
+                    )
+                }
+                if sent <= 0 { return }
+                offset += sent
+            }
         }
     }
 }

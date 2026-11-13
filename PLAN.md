@@ -21,23 +21,24 @@
 - [x] `FPTNClient`, `FPTNRelay`.
 - [x] iOS SwiftUI app с темами Aurora/Ember.
 - [x] NetworkExtension skeleton.
-- [x] Linux tests: 403 (352 core + 51 shared), 0 падений, 0 warnings.
+- [x] Linux tests: 428 (357 core + 71 shared), 0 падений, 0 warnings.
 - [x] Linux live probe: login/DNS/tunnel/DNS через туннель, plain/obfuscated/reality.
 - [x] Проверить на реальном FPTN-сервере все три режима маскировки (`Tools/LiveProbe`).
 - [x] Публичный репозиторий `alex0310/FptnClient-iOS` и CI на GitHub Actions (Ubuntu + macOS-раннер).
+- [x] Метрики трафика из extension в app: байты/пакеты RX-TX и скорость в Diagnostics.
+- [x] Swift 6 language mode для всего пакета: 0 warnings, все тесты проходят.
 
 ## Следующие шаги
 
 - [x] Собрать iOS app и extension на macOS (GitHub Actions, `macos-15`, Xcode 16.4).
 - [ ] Проверить на устройстве: Keychain, On-Demand, обязательные CIDR,
   динамические host-маршруты и гонку «DNS-ответ → первое подключение».
-- [ ] Метрики трафика из extension в app.
+- [ ] Проверить метрики трафика в живом туннеле на устройстве.
 - [ ] UI-тесты и snapshot-тесты тем.
-- [ ] Проверить, что `swift build` не даёт предупреждений на Swift 6 language mode.
 
 ## Открытые вопросы
 
 1. Нужна ли строгая проверка цепочки сертификатов для не-FPTN серверов?
 2. Нужен ли Always On / принудительный on-demand без ручного отключения?
-3. Как показывать трафик: байты, скорость, график?
+3. Нужен ли график трафика (сейчас показываются байты, пакеты и скорость)?
 4. Нужна ли третья светлая тема?

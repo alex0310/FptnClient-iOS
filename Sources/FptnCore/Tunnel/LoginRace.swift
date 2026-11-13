@@ -99,6 +99,11 @@ public enum LoginRace {
         let state = RaceState()
         let done = DispatchSemaphore(value: 0)
         let group = DispatchGroup()
+        // `DispatchQueue.async` requires a @Sendable closure. The login
+        // operation is deliberately invoked concurrently: each call opens its
+        // own HTTP/TLS connection and owns all captured state, so it is safe
+        // to share while keeping the public API free of a @Sendable requirement.
+        let operation = LoginOperation(run: login)
 
         for server in picked {
             group.enter()
@@ -110,7 +115,7 @@ public enum LoginRace {
                     state.lock.unlock()
                     if stop { return }
                     do {
-                        let token = try login(server)
+                        let token = try operation.run(server)
                         state.lock.lock()
                         if state.result == nil {
                             state.result = LoginRaceResult(server: server, token: token)
@@ -146,4 +151,10 @@ private final class RaceState: @unchecked Sendable {
     let lock = NSLock()
     var result: LoginRaceResult?
     var cancelled = false
+}
+
+/// See the concurrency note in `race`: the login closure is shared across
+/// the racing tasks on purpose, without forcing callers to mark it @Sendable.
+private struct LoginOperation: @unchecked Sendable {
+    let run: (FPTNServer) throws -> String
 }

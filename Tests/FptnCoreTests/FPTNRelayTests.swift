@@ -215,6 +215,96 @@ final class FPTNRelayTests: XCTestCase {
         XCTAssertEqual(store.snapshot(), [IPAddress("1.2.3.4")!])
         XCTAssertEqual(changes, 1)
     }
+
+    // MARK: - Traffic accounting
+
+    func testTrafficCallbacksCountForwardedBytesAndPackets() throws {
+        var outbound = (bytes: 0, packets: 0)
+        let relay = FPTNRelay(
+            sender: RelaySender(),
+            sink: RelaySink(),
+            onOutboundTraffic: { bytes, packets in
+                outbound.bytes += bytes
+                outbound.packets += packets
+            }
+        )
+        let packets = [icmpPacket(), icmpPacket(destination: [4, 4, 4, 4])]
+
+        XCTAssertEqual(try relay.forwardOutgoing(packets), 2)
+        XCTAssertEqual(outbound.bytes, packets.reduce(0) { $0 + $1.count })
+        XCTAssertEqual(outbound.packets, 2)
+    }
+
+    func testTrafficCallbacksIgnoreSplitExcludedOutgoingPackets() throws {
+        var outbound = (bytes: 0, packets: 0)
+        let split = try SplitTunnel(cidrs: ["10.0.0.0/8"])
+        let relay = FPTNRelay(
+            sender: RelaySender(),
+            sink: RelaySink(),
+            splitTunnel: split,
+            onOutboundTraffic: { bytes, packets in
+                outbound.bytes += bytes
+                outbound.packets += packets
+            }
+        )
+        let excluded = icmpPacket(destination: [10, 1, 2, 3])
+        let forwarded = icmpPacket(destination: [8, 8, 8, 8])
+
+        XCTAssertEqual(try relay.forwardOutgoing([excluded, forwarded]), 1)
+        XCTAssertEqual(outbound.bytes, forwarded.count)
+        XCTAssertEqual(outbound.packets, 1)
+    }
+
+    func testTrafficCallbacksCountIncomingBytesAndPackets() throws {
+        var inbound = (bytes: 0, packets: 0)
+        let relay = FPTNRelay(
+            sender: RelaySender(),
+            sink: RelaySink(),
+            onInboundTraffic: { bytes, packets in
+                inbound.bytes += bytes
+                inbound.packets += packets
+            }
+        )
+        let packets = [icmpPacket(), icmpPacket(destination: [4, 4, 4, 4])]
+
+        try relay.forwardIncoming(packets)
+        XCTAssertEqual(inbound.bytes, packets.reduce(0) { $0 + $1.count })
+        XCTAssertEqual(inbound.packets, 2)
+    }
+
+    func testTrafficCallbacksSkipEmptyBatches() throws {
+        var calls = 0
+        let relay = FPTNRelay(
+            sender: RelaySender(),
+            sink: RelaySink(),
+            onInboundTraffic: { _, _ in calls += 1 },
+            onOutboundTraffic: { _, _ in calls += 1 }
+        )
+        XCTAssertEqual(try relay.forwardOutgoing([]), 0)
+        try relay.forwardIncoming([])
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testOutboundTrafficIsNotRecordedWhenSenderFails() throws {
+        var outbound = (bytes: 0, packets: 0)
+        let relay = FPTNRelay(
+            sender: FailingSender(),
+            sink: RelaySink(),
+            onOutboundTraffic: { bytes, packets in
+                outbound.bytes += bytes
+                outbound.packets += packets
+            }
+        )
+        XCTAssertThrowsError(try relay.forwardOutgoing([icmpPacket()]))
+        XCTAssertEqual(outbound.bytes, 0)
+        XCTAssertEqual(outbound.packets, 0)
+    }
+}
+
+private final class FailingSender: PacketSender {
+    func send(packets: [[UInt8]]) throws -> Int {
+        throw TransportError.timeout
+    }
 }
 
 private final class RelaySender: PacketSender {

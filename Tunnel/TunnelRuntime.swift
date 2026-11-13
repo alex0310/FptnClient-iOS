@@ -28,6 +28,7 @@ final class TunnelRuntime {
     private let controlQueue = DispatchQueue(label: "com.example.fptnclient.control")
     private let outgoingQueue = DispatchQueue(label: "com.example.fptnclient.outgoing")
     private let stateLock = NSLock()
+    private let traffic = TrafficCounter()
 
     private var client: FPTNClient?
     private var device: PacketFlowDevice?
@@ -92,6 +93,10 @@ final class TunnelRuntime {
                 )
                 self.client = client
                 self.device = device
+                // A fresh session ID makes the app drop the previous tunnel's
+                // totals instead of showing a jump when we reconnect.
+                TrafficSnapshotStore.write(self.traffic.reset())
+                let traffic = self.traffic
                 self.relay = FPTNRelay(
                     sender: client,
                     sink: device,
@@ -101,6 +106,12 @@ final class TunnelRuntime {
                         self?.controlQueue.async {
                             self?.scheduleRouteRefresh()
                         }
+                    },
+                    onInboundTraffic: { bytes, packets in
+                        traffic.recordInbound(bytes: bytes, packets: packets)
+                    },
+                    onOutboundTraffic: { bytes, packets in
+                        traffic.recordOutbound(bytes: bytes, packets: packets)
                     }
                 )
                 self.startTimer()
@@ -120,8 +131,13 @@ final class TunnelRuntime {
         routeUpdateWorkItem = nil
         timer?.cancel()
         timer = nil
+        publishTraffic()
         client?.stop()
         client = nil
+    }
+
+    private func publishTraffic() {
+        TrafficSnapshotStore.write(traffic.snapshot())
     }
 
     // MARK: - Network settings
@@ -302,6 +318,7 @@ final class TunnelRuntime {
                 return
             }
             self.startReaders()
+            self.publishTraffic()
         }
         source.resume()
         timer = source

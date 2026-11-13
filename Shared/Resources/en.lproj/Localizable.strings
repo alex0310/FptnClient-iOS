@@ -105,6 +105,14 @@
 "diagnostics.tlsValue" = "TLS 1.3, pinned leaf MD5";
 "diagnostics.keepaliveValue" = "15 s / dead 90 s";
 "diagnostics.lifetimeValue" = "600 s, 60 s replacement lead";
+"diagnostics.traffic" = "Traffic";
+"diagnostics.traffic.received" = "Received";
+"diagnostics.traffic.sent" = "Sent";
+"diagnostics.traffic.packetsIn" = "Packets in";
+"diagnostics.traffic.packetsOut" = "Packets out";
+"diagnostics.traffic.downSpeed" = "Download speed";
+"diagnostics.traffic.upSpeed" = "Upload speed";
+"diagnostics.traffic.noData" = "No traffic data yet";
 
 "split.title" = "Split tunnel";
 "split.domainRules" = "DOMAIN RULES";

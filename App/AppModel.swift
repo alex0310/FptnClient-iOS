@@ -14,9 +14,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var status: NEVPNStatus = .invalid
     @Published var lastError: String?
     @Published var isBusy = false
+    @Published private(set) var traffic: TrafficSnapshot?
+    @Published private(set) var trafficSpeed: TrafficSpeed?
 
     private let vpn = VPNController()
     private let tokenStore: any TokenStore
+    private var trafficTimer: Timer?
+    private var previousTraffic: TrafficSnapshot?
 
     init(tokenStore: any TokenStore = TokenStorage.make()) {
         self.tokenStore = tokenStore
@@ -200,6 +204,46 @@ final class AppModel: ObservableObject {
     func refreshStatus() async {
         await vpn.reloadStatus()
         status = vpn.status
+        updateTrafficPolling()
+    }
+
+    // MARK: - Traffic
+
+    /// The extension publishes a snapshot once a second into the App Group
+    /// container. Polling (rather than a Darwin notification) keeps the app
+    /// side simple and works while the app is in the foreground.
+    private func updateTrafficPolling() {
+        guard isConnected else {
+            trafficTimer?.invalidate()
+            trafficTimer = nil
+            previousTraffic = nil
+            traffic = nil
+            trafficSpeed = nil
+            return
+        }
+        guard trafficTimer == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshTraffic() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        trafficTimer = timer
+        refreshTraffic()
+    }
+
+    private func refreshTraffic() {
+        guard isConnected, let current = TrafficSnapshotStore.read() else {
+            previousTraffic = nil
+            traffic = nil
+            trafficSpeed = nil
+            return
+        }
+        if let previous = previousTraffic {
+            trafficSpeed = current.speed(relativeTo: previous)
+        } else {
+            trafficSpeed = nil
+        }
+        previousTraffic = current
+        traffic = current
     }
 
     func applyOnDemandSetting(_ enabled: Bool) async {

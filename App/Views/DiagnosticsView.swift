@@ -72,6 +72,52 @@ struct DiagnosticsView: View {
             .listRowBackground(palette.surface)
 
             Section {
+                if let traffic = model.traffic {
+                    InfoRow(
+                        label: model.l10n.text(.diagnosticsTrafficReceived),
+                        value: TrafficFormatter.bytes(traffic.rxBytes),
+                        palette: palette
+                    )
+                    InfoRow(
+                        label: model.l10n.text(.diagnosticsTrafficSent),
+                        value: TrafficFormatter.bytes(traffic.txBytes),
+                        palette: palette
+                    )
+                    InfoRow(
+                        label: model.l10n.text(.diagnosticsTrafficPacketsIn),
+                        value: TrafficFormatter.packets(traffic.rxPackets),
+                        palette: palette
+                    )
+                    InfoRow(
+                        label: model.l10n.text(.diagnosticsTrafficPacketsOut),
+                        value: TrafficFormatter.packets(traffic.txPackets),
+                        palette: palette
+                    )
+                    InfoRow(
+                        label: model.l10n.text(.diagnosticsTrafficDownSpeed),
+                        value: model.trafficSpeed
+                            .map { TrafficFormatter.speed($0.rxBytesPerSecond) } ?? "—",
+                        palette: palette
+                    )
+                    InfoRow(
+                        label: model.l10n.text(.diagnosticsTrafficUpSpeed),
+                        value: model.trafficSpeed
+                            .map { TrafficFormatter.speed($0.txBytesPerSecond) } ?? "—",
+                        palette: palette
+                    )
+                } else {
+                    InfoRow(
+                        label: model.l10n.text(.diagnosticsTrafficNoData),
+                        value: "—",
+                        palette: palette
+                    )
+                }
+            } header: {
+                header(model.l10n.text(.diagnosticsTraffic))
+            }
+            .listRowBackground(palette.surface)
+
+            Section {
                 InfoRow(
                     label: model.l10n.text(.diagnosticsProtocol),
                     value: model.l10n.text(.diagnosticsProtocolValue),

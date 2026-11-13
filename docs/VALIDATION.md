@@ -4,9 +4,10 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2 | 403 теста (352 + 51), 0 падений |
-| `FptnCore` warnings | Linux | 0 |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 428 тестов (357 + 71), 0 падений |
+| `FptnCore` warnings | Linux, `-Xswiftc -warnings-as-errors` | 0 |
 | `swift build` / `swiftc -parse App/ Tunnel/` | Linux | 0 warnings, 0 errors |
+| `Tools/LiveProbe` | Linux, Swift 6 mode ядра | сборка без ошибок |
 | CI `core` | GitHub Actions, `ubuntu-24.04`, Swift 6.2 | success |
 | CI `ios-build` | GitHub Actions, `macos-15`, Xcode 16.4 | success, сборка без подписи |
 | iOS app | macOS/Xcode | type-check и сборка в CI, на устройстве не проверялось |
@@ -19,7 +20,41 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 352 tests` для `FptnCore` и `Executed 51 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors.
+Последний прогон: `Executed 357 tests` для `FptnCore` и `Executed 71 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+
+## Swift 6 language mode
+
+`Package.swift` задаёт `swiftLanguageModes: [.v6]`; зависимости сохраняют свой
+собственный язык (по tools-version), поэтому `swift-crypto` не попадает под
+чужие проверки. Перевод выявил две проблемы:
+
+- `LoginRace`: `@Sendable`-замыкание `DispatchQueue.async` захватывало обычный
+  `(FPTNServer) throws -> String`. Решение — документированный
+  `LoginOperation: @unchecked Sendable`: гонка логинов по замыслу вызывается
+  параллельно, и каждый вызов владеет своим соединением. Публичный API остался
+  без требования `@Sendable`.
+- `POSIXSocketTests`: `Thread` захватывал `self` (`EchoServer`). Цикл сервера
+  вынесен в свободную функцию `echoServerLoop(descriptor:echo:)`, замыкание
+  теперь захватывает только `Int32` и `Bool`.
+
+Проверка: `swift test` в `.v6` — 0 errors, 0 warnings. `PackageManifestTests`
+не даёт случайно откатить режим на `.v5`.
+
+## Метрики трафика
+
+- `FPTNRelay` сообщает `(bytes, packets)` через `onInboundTraffic` /
+  `onOutboundTraffic` **после** split-фильтрации и успешной отправки/записи,
+  поэтому исключённый трафик и handshake/keepalive в счёт не входят.
+- `TrafficCounter` (`FptnShared`) — потокобезопасный аккумулятор с новым
+  `sessionID` на каждое подключение; снимок `TrafficSnapshot` пишется в
+  App Group `group.com.example.fptnclient` раз в секунду из уже существующего
+  таймера `TunnelRuntime` и дополнительно при остановке.
+- `AppModel` раз в секунду читает снимок, вычисляет `TrafficSpeed` по двум
+  соседним точкам и публикует `@Published`-поля. Новая секция Diagnostics
+  показывает RX/TX байты, пакеты и скорости; подписи локализованы RU/EN.
+- Формат по умолчанию — суммарные байты + пакеты + текущая скорость; график
+  пока не реализован (открытый вопрос в `PLAN.md`).
+- На устройстве метрики ещё не проверялись.
 
 ## CI на GitHub Actions
 
@@ -95,7 +130,15 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   CIDR.
 - `SplitTunnelRouteStore` дедупликация, порядок, лимит и вытеснение.
 - `FPTNClient` start/login/DNS/pool/send/stop.
-- `FPTNRelay` forwarding, split actions и изучение DNS/SNI-адресов.
+- `FPTNRelay` forwarding, split actions, изучение DNS/SNI-адресов и учёт
+  трафика (байты/пакеты после split-фильтрации, пустые батчи, ошибка sender).
+- `TrafficCounter` (параллельные инкременты, reset/session, переполнение),
+  `TrafficSnapshot.speed` (смена сессии, обратное время, сброс счётчиков),
+  `TrafficFormatter` (бинарные единицы, некорректные значения),
+  `TrafficSnapshotStore` (round-trip, битые данные, clear).
+- `TrafficIntegrationTests`: исходники `App/`/`Tunnel/` обязаны содержать
+  хуки записи, чтения и отображения метрик.
+- `PackageManifestTests`: `swiftLanguageModes: [.v6]` не откатывается.
 - `SharedSettings` Codable/legacy decode, bundled 2158-domain list, import parsing/merge.
 - `OnDemandPolicy` automatic/manual rule descriptors.
 - `Localizer`, `AppLanguage` и полнота `en`/`ru` словарей, форматирование и выбор системного языка.
@@ -115,6 +158,8 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
 - Переключение языка в живом UI проверяется только на macOS/iOS; Linux-тесты проверяют словари и `Localizer`.
 - Все 19 серверов и длительная работа pool под нагрузкой; live-прогон покрывает по одному серверу на режим.
 - iOS route installation и `NEPacketTunnelFlow` на устройстве.
+- Метрики трафика в живом туннеле: запись снимков из extension, чтение в app,
+  корректность скоростей при смене сети и реконнекте.
 - Динамическое обновление `excludedRoutes` через `setTunnelNetworkSettings` во
   время работы туннеля и гонка «DNS-ответ → первое подключение».
 - Доменные правила при DoH/DoT: такие DNS-ответы не видны extension.

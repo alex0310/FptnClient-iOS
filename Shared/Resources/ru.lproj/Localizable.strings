@@ -105,6 +105,14 @@
 "diagnostics.tlsValue" = "TLS 1.3, pinned MD5 листа";
 "diagnostics.keepaliveValue" = "15 с / мёртв 90 с";
 "diagnostics.lifetimeValue" = "600 с, замена за 60 с";
+"diagnostics.traffic" = "Трафик";
+"diagnostics.traffic.received" = "Принято";
+"diagnostics.traffic.sent" = "Отправлено";
+"diagnostics.traffic.packetsIn" = "Пакетов входящих";
+"diagnostics.traffic.packetsOut" = "Пакетов исходящих";
+"diagnostics.traffic.downSpeed" = "Скорость загрузки";
+"diagnostics.traffic.upSpeed" = "Скорость отдачи";
+"diagnostics.traffic.noData" = "Данных о трафике пока нет";
 
 "split.title" = "Split-туннель";
 "split.domainRules" = "ДОМЕННЫЕ ПРАВИЛА";
