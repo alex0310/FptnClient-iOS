@@ -23,7 +23,7 @@
 ```
 
 `FptnCore` не импортирует `NetworkExtension` и не знает про TUN. Это позволяет
-запускать 428 unit-тестов на Linux (357 в `FptnCore` и 71 в `FptnShared`).
+запускать 429 unit-тестов на Linux (358 в `FptnCore` и 71 в `FptnShared`).
 iOS-слой знает только про `PacketSender` и `PacketSink` из `FPTNRelay`.
 
 `FptnShared` также содержит `Localizer` и словари `en.lproj`/`ru.lproj`. UI берёт

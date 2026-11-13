@@ -4,7 +4,7 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 428 тестов (357 + 71), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 429 тестов (358 + 71), 0 падений |
 | `FptnCore` warnings | Linux, `-Xswiftc -warnings-as-errors` | 0 |
 | `swift build` / `swiftc -parse App/ Tunnel/` | Linux | 0 warnings, 0 errors |
 | `Tools/LiveProbe` | Linux, Swift 6 mode ядра | сборка без ошибок |
@@ -20,7 +20,7 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 357 tests` для `FptnCore` и `Executed 71 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+Последний прогон: `Executed 358 tests` для `FptnCore` и `Executed 71 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
 
 ## Swift 6 language mode
 
@@ -36,9 +36,21 @@
 - `POSIXSocketTests`: `Thread` захватывал `self` (`EchoServer`). Цикл сервера
   вынесен в свободную функцию `echoServerLoop(descriptor:echo:)`, замыкание
   теперь захватывает только `Int32` и `Bool`.
+- `FPTNRelay` стал `@unchecked Sendable`: он разделяется между control queue и
+  очередями читателей пула, все его поля неизменяемы, а `SplitTunnel` и
+  `SplitTunnelRouteStore` уже потокобезопасны. Это убрало 2 warning из
+  macOS-сборки (`capture of 'relay' with non-sendable type`). Compile-time
+  проверка — `testRelayIsSendableForCrossQueueUse`.
 
 Проверка: `swift test` в `.v6` — 0 errors, 0 warnings. `PackageManifestTests`
-не даёт случайно откатить режим на `.v5`.
+не даёт случайно откатить режим на `.v5`. CI собирает оба таргета с
+`-Xswiftc -warnings-as-errors`.
+
+Отдельно CI (`ubuntu-24.04`, Swift 6.2) поймал то, чего не видно на локальном
+Swift 6.4.2: локальная константа `descriptor` в `POSIXSocketTests` перекрывала
+одноимённое свойство в более ранних замыканиях `bind`/`getsockname`
+(`closure captures 'descriptor' before it is declared`). Константа
+переименована в `listenDescriptor`.
 
 ## Метрики трафика
 
@@ -62,8 +74,8 @@
 `.github/workflows/ci.yml` запускается на `push`/`pull_request` в `main` и через
 `workflow_dispatch`:
 
-- `core` (`ubuntu-24.04`, Swift 6.2): `swift build`, `swift test`,
-  `swiftc -parse App/*.swift App/*/*.swift Tunnel/*.swift`;
+- `core` (`ubuntu-24.04`, Swift 6.2): `swift build -Xswiftc -warnings-as-errors`,
+  `swift test`, `swiftc -parse App/*.swift App/*/*.swift Tunnel/*.swift`;
 - `ios-build` (`macos-15`): `xcodegen generate` и `xcodebuild ... build`
   с `CODE_SIGNING_ALLOWED=NO` для app и extension.
 
@@ -83,10 +95,11 @@ macOS-CI нашёл две ошибки, которые невозможно у�
    `TunnelRuntime.start` принимает `completion:`, а не `completionHandler:`.
    Регрессию проверяет `TunnelCallSiteTests`.
 
-Итоговый прогон (commit `d990440`): оба job — `success`, Swift-компилятор
-не выдал ни одного warning. В логах остаются только сторонние предупреждения
+Итоговый прогон (commit `776b68a`): оба job — `success`, **0 Swift-warning и
+0 Swift-error** в обоих логах. Остаются только сторонние предупреждения
 инструментов: `gpg` при установке Swift, `appintentsmetadataprocessor` Xcode
 (нет зависимости от `AppIntents.framework`) и уведомление runner о Node.js 20.
+Прогон: https://github.com/alex0310/FptnClient-iOS/actions/runs/43432475597
 
 ## Живая проверка FPTN
 
@@ -130,8 +143,9 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   CIDR.
 - `SplitTunnelRouteStore` дедупликация, порядок, лимит и вытеснение.
 - `FPTNClient` start/login/DNS/pool/send/stop.
-- `FPTNRelay` forwarding, split actions, изучение DNS/SNI-адресов и учёт
-  трафика (байты/пакеты после split-фильтрации, пустые батчи, ошибка sender).
+- `FPTNRelay` forwarding, split actions, изучение DNS/SNI-адресов, учёт
+  трафика (байты/пакеты после split-фильтрации, пустые батчи, ошибка sender)
+  и compile-time проверка `Sendable`.
 - `TrafficCounter` (параллельные инкременты, reset/session, переполнение),
   `TrafficSnapshot.speed` (смена сессии, обратное время, сброс счётчиков),
   `TrafficFormatter` (бинарные единицы, некорректные значения),
