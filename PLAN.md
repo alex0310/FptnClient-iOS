@@ -21,14 +21,16 @@
 - [x] `FPTNClient`, `FPTNRelay`.
 - [x] iOS SwiftUI app с темами Aurora/Ember.
 - [x] NetworkExtension skeleton.
-- [x] Linux tests: 402 (352 core + 50 shared), 0 падений, 0 warnings.
+- [x] Linux tests: 403 (352 core + 51 shared), 0 падений, 0 warnings.
 - [x] Linux live probe: login/DNS/tunnel/DNS через туннель, plain/obfuscated/reality.
 - [x] Проверить на реальном FPTN-сервере все три режима маскировки (`Tools/LiveProbe`).
 - [x] Публичный репозиторий `alex0310/FptnClient-iOS` и CI на GitHub Actions (Ubuntu + macOS-раннер).
 
 ## Следующие шаги
 
-- [ ] Собрать iOS app и extension на macOS.
+- [x] Собрать iOS app и extension на macOS (GitHub Actions, `macos-15`, Xcode 16.4).
+- [ ] Проверить на устройстве: Keychain, On-Demand, обязательные CIDR,
+  динамические host-маршруты и гонку «DNS-ответ → первое подключение».
 - [ ] Метрики трафика из extension в app.
 - [ ] UI-тесты и snapshot-тесты тем.
 - [ ] Проверить, что `swift build` не даёт предупреждений на Swift 6 language mode.

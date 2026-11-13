@@ -4,13 +4,13 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2 | 402 теста (352 + 50), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2 | 403 теста (352 + 51), 0 падений |
 | `FptnCore` warnings | Linux | 0 |
 | `swift build` / `swiftc -parse App/ Tunnel/` | Linux | 0 warnings, 0 errors |
-| CI `core` | GitHub Actions, `ubuntu-24.04`, Swift 6.2 | запускается при каждом push |
-| CI `ios-build` | GitHub Actions, `macos-15`, Xcode 16.4 | сборка без подписи |
-| iOS app | macOS/Xcode | компилируется в CI, на устройстве не проверялось |
-| NetworkExtension | macOS/Xcode | компилируется в CI, на устройстве не проверялось |
+| CI `core` | GitHub Actions, `ubuntu-24.04`, Swift 6.2 | success |
+| CI `ios-build` | GitHub Actions, `macos-15`, Xcode 16.4 | success, сборка без подписи |
+| iOS app | macOS/Xcode | type-check и сборка в CI, на устройстве не проверялось |
+| NetworkExtension | macOS/Xcode | type-check и сборка в CI, на устройстве не проверялось |
 | Живой FPTN-сервер | Linux, `Tools/LiveProbe` | login, DNS API, tunnel, DNS-запрос: OK |
 
 Команда:
@@ -19,7 +19,7 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 352 tests` для `FptnCore` и `Executed 50 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors.
+Последний прогон: `Executed 352 tests` для `FptnCore` и `Executed 51 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors.
 
 ## CI на GitHub Actions
 
@@ -37,11 +37,21 @@
 `ubuntu-24.04`. Swift закреплён за 6.2, так как `swift-asn1` в
 `Package.resolved` использует `swift-tools-version:6.1`.
 
-Первый прогон macOS-CI нашёл ошибку, которую нельзя увидеть на Linux:
-`'IPAddress' is ambiguous for type lookup` в `Tunnel/TunnelRuntime.swift`
-(`NetworkExtension` тянет системный модуль с одноимённым типом). Все обращения
-к `IPAddress` в `App/` и `Tunnel/` теперь пишутся как `FptnCore.IPAddress`;
-регрессию проверяет `TunnelSourceQualificationTests`.
+macOS-CI нашёл две ошибки, которые невозможно увидеть на Linux (`swiftc -parse`
+не делает type-check):
+
+1. `'IPAddress' is ambiguous for type lookup` в `Tunnel/TunnelRuntime.swift`
+   (`NetworkExtension` тянет системный модуль с одноимённым типом). Все обращения
+   к `IPAddress` в `App/` и `Tunnel/` теперь пишутся как `FptnCore.IPAddress`;
+   регрессию проверяет `TunnelSourceQualificationTests`.
+2. `incorrect argument label in call` в `Tunnel/PacketTunnelProvider.swift`:
+   `TunnelRuntime.start` принимает `completion:`, а не `completionHandler:`.
+   Регрессию проверяет `TunnelCallSiteTests`.
+
+Итоговый прогон (commit `d990440`): оба job — `success`, Swift-компилятор
+не выдал ни одного warning. В логах остаются только сторонние предупреждения
+инструментов: `gpg` при установке Swift, `appintentsmetadataprocessor` Xcode
+(нет зависимости от `AppIntents.framework`) и уведомление runner о Node.js 20.
 
 ## Живая проверка FPTN
 
@@ -94,6 +104,8 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   settings blob.
 - `TunnelSourceQualificationTests`: все обращения к `IPAddress` в `App/` и
   `Tunnel/` обязаны быть записаны как `FptnCore.IPAddress`.
+- `TunnelCallSiteTests`: `PacketTunnelProvider` вызывает
+  `TunnelRuntime.start(completion:)` с корректным ярлыком аргумента.
 
 ## Что не покрыто
 

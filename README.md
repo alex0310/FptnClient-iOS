@@ -98,10 +98,11 @@ open FptnClient.xcodeproj
 
 ## Ограничения
 
-- iOS-приложение и расширение **не собраны на этой машине**: здесь Linux и нет
-  macOS/Xcode. Ядро собрано и протестировано; iOS-часть проверяется в CI на macOS.
-- Live-проверка транспорта выполнена через `Tools/LiveProbe`; iOS-слой
-  (NetworkExtension, маршруты, On-Demand) по-прежнему требует macOS/Xcode.
+- Локально здесь Linux без macOS/Xcode: ядро собрано и протестировано, а
+  iOS-часть собирается и проходит type-check в GitHub Actions на `macos-15`.
+  Запуск на реальном устройстве не выполнялся.
+- Live-проверка транспорта выполнена через `Tools/LiveProbe`; поведение
+  NetworkExtension, маршрутов и On-Demand на устройстве ещё не проверено.
 - В токене нет отдельного поля «режим маскировки»; режим выбирается в настройках.
 - On-Demand использует правило «connect for any interface». Если выключить
   туннель вручную, но оставить On-Demand включённым, iOS может снова поднять его
@@ -128,3 +129,7 @@ open FptnClient.xcodeproj
 - [Валидация](docs/VALIDATION.md)
 - [Живая проверка ядра](Tools/LiveProbe/README.md)
 - [План работ](PLAN.md)
+
+## Лицензия
+
+Apache License 2.0, см. [LICENSE](LICENSE).
