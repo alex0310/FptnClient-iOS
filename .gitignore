@@ -1,0 +1,10 @@
+.build/
+.swiftpm/
+DerivedData/
+build/
+FptnClient.xcodeproj/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+.DS_Store
+.env

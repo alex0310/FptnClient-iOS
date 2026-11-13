@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Core build and tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+      - name: Build FptnCore and FptnShared
+        run: swift build
+      - name: Test FptnCore and FptnShared
+        run: swift test
+      - name: Parse iOS app and extension sources
+        run: swiftc -parse App/*.swift App/*/*.swift Tunnel/*.swift
+
+  ios-build:
+    name: iOS app and extension build (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build app and extension without signing
+        run: |
+          xcodebuild \
+            -project FptnClient.xcodeproj \
+            -scheme FptnClient \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build

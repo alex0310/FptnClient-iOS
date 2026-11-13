@@ -1,0 +1,128 @@
+# FPTN iOS
+
+Независимый Swift-клиент FPTN для iOS: собственный TLS 1.3, YAFF/WebSocket,
+rolling pool из двух или трёх туннелей, split tunnel и оригинальный SwiftUI-интерфейс
+с двумя темами оформления.
+
+Репозиторий намеренно разделён на две части:
+
+- `FptnCore` — платформонезависимый Swift Package. Его можно собрать и протестировать
+  на Linux и macOS без Xcode. Здесь живут протокол, TLS, HTTP/WebSocket, пул,
+  split tunnel, NTP и оркестрация клиента.
+- `App/`, `Tunnel/` — iOS-приложение и NetworkExtension. Они требуют macOS,
+  Xcode и подписанный provisioning profile.
+- `FptnShared` — небольшой общий пакет для настроек, Keychain-абстракции и
+  встроенного списка доменов split tunnel; его использует и приложение, и
+  расширение.
+
+## Быстрый старт
+
+### Только ядро
+
+```bash
+swift test
+```
+
+На текущей машине Swift установлен в `/home/vasek/opt/swift-6.4.2/usr/bin/swift`:
+
+```bash
+/home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
+```
+
+### Живая проверка ядра
+
+```bash
+FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
+  swift run --package-path Tools/LiveProbe FptnProbe
+```
+
+Подробности — в [Tools/LiveProbe/README.md](Tools/LiveProbe/README.md).
+
+### iOS-приложение
+
+```bash
+brew install xcodegen
+xcodegen generate
+open FptnClient.xcodeproj
+```
+
+Перед запуском на устройстве замените placeholder-идентификаторы:
+
+- bundle id приложения: `com.example.fptnclient`;
+- bundle id расширения: `com.example.fptnclient.tunnel`;
+- App Group: `group.com.example.fptnclient`;
+- `DEVELOPMENT_TEAM` в `project.yml`.
+
+Подробности — в [docs/BUILDING.md](docs/BUILDING.md).
+
+## Что уже реализовано
+
+- Разбор токенов `fptn:`, `fptn://`, `fptnb:` (Brotli) и `censored_zone_servers`.
+- Собственный TLS 1.3-клиент: ClientHello, X25519, HKDF, AES-GCM/ChaCha20-Poly1305,
+  Finished, KeyUpdate, фрагментация, pinned MD5 leaf-сертификата.
+- Три режима маскировки: plain SNI, TLS obfuscation (`TlsObfuscator2`) и reality
+  с decoy ClientHello/ServerHello.
+- HTTP/1.1 API (`/api/v1/login`, `/api/v1/dns`) и WebSocket upgrade на `/api/v1/fptn`.
+- YAFF-кодек с golden-векторами, `MSG_IP_ASSIGNMENT`, `MSG_IP_PACKET`,
+  `MSG_BATCH_IP_PACKET`, `MSG_ERROR`.
+- Перезапись source/destination IP и пересчёт контрольных сумм IPv4/IPv6.
+- Keepalive 15 с, dead-peer 90 с, rolling lifetime 600 с с заменой за 60 с.
+- `TunnelPool`: dual/triple, login race по случайной половине серверов,
+  привязка потока по source port, staggered-замены, общий `SessionID`.
+- Закреплённый сервер пробуется первым при логине; при ошибке клиент
+  возвращается к обычной гонке по остальным серверам.
+- Reconnect budget 5 попыток / 120 с с экспоненциальной задержкой.
+- Split tunnel по CIDR и доменным правилам, включая разбор SNI и DNS A/AAAA,
+  генерацию TCP RST и динамические host-маршруты `/32`/`/128`. Локальные сети и
+  системный трафик (`10/8`, `172.16/12`, `192.168/16`, loopback, link-local,
+  multicast, IPv6 ULA/link-local/multicast) исключаются всегда. В комплект входит
+  полный список OpenWRT (2158 доменов); пользователь может импортировать свой
+  `.txt`-список и дополнить или заменить его.
+- SNTP-клиент и `TimeProvider` на монотонном клоке.
+- iOS UI: две оригинальные темы (`Aurora`, `Ember`), orb-статус, список серверов,
+  импорт токена, настройки, диагностика.
+- `Assets.xcassets` с оригинальной app icon; PNG генерируется воспроизводимым
+  скриптом `Tools/AppIcon/generate.py` без внешних графических зависимостей.
+- Локализация RU/EN с выбором языка: системный, English или Русский. Строки
+  вынесены в `FptnShared` и покрыты тестами на полноту обоих словарей.
+- On-Demand по умолчанию: после первого ручного подключения iOS автоматически
+  поднимает туннель; в настройках есть переключатель на ручной режим.
+- Токен хранится в Keychain приложения с миграцией из старого App Group
+  `UserDefaults`; расширение получает его через `providerConfiguration`
+  сохранённого VPN-профиля. При удалении токена приложение очищает и Keychain,
+  и поле `token` в профиле.
+- NetworkExtension: `NEPacketTunnelProvider`, TUN ↔ WebSocket relay,
+  установка маршрутов и DNS.
+
+## Ограничения
+
+- iOS-приложение и расширение **не собраны на этой машине**: здесь Linux и нет
+  macOS/Xcode. Ядро собрано и протестировано; iOS-часть проверяется в CI на macOS.
+- Live-проверка транспорта выполнена через `Tools/LiveProbe`; iOS-слой
+  (NetworkExtension, маршруты, On-Demand) по-прежнему требует macOS/Xcode.
+- В токене нет отдельного поля «режим маскировки»; режим выбирается в настройках.
+- On-Demand использует правило «connect for any interface». Если выключить
+  туннель вручную, но оставить On-Demand включённым, iOS может снова поднять его
+  при смене сети; для гарантированно ручного режима отключите On-Demand.
+- Встроенный доменный список — снимок `data/split-tunnel-domains.txt` из
+  `alex0310/openwrt-fptn` (2158 записей). Пользовательский список хранится в
+  App Group и объединяется со встроенным с дедупликацией.
+- Доменные исключения работают через обычный DNS (UDP/53) и TLS SNI. DNS over
+  HTTPS/TLS внутри туннеля по домену не распознаётся. Обновление host-маршрутов
+  делается с debounce; первое подключение после DNS-ответа может успеть уйти в
+  туннель до применения маршрута, после RST клиент повторяет его напрямую.
+- Keychain-элемент приложения не использует общий `kSecAttrAccessGroup`:
+  расширение получает токен через `providerConfiguration`, а не читает Keychain
+  напрямую. Если понадобится общий доступ, нужно добавить `keychain-access-groups`
+  и `FPTNKeychainAccessGroup` в Info.plist.
+
+## Документация
+
+- [Архитектура](docs/ARCHITECTURE.md)
+- [Протокол](docs/PROTOCOL.md)
+- [Безопасность](docs/SECURITY.md)
+- [Дизайн](docs/DESIGN.md)
+- [Сборка](docs/BUILDING.md)
+- [Валидация](docs/VALIDATION.md)
+- [Живая проверка ядра](Tools/LiveProbe/README.md)
+- [План работ](PLAN.md)
