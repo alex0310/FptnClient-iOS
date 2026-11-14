@@ -81,9 +81,11 @@ final class TLSCertificateTests: XCTestCase {
         }
     }
 
-    func testPinnerSkipsCheckWhenFingerprintIsNil() {
+    func testPinnerFailsClosedWhenFingerprintIsNil() {
         let pinner = CertificatePinner(expectedFingerprint: nil)
-        XCTAssertNoThrow(try pinner.verify(leafDER: leaf))
+        XCTAssertThrowsError(try pinner.verify(leafDER: leaf)) { error in
+            XCTAssertEqual(error as? TLSError, .missingServerAuthentication)
+        }
     }
 
     func testPinnerRejectsMalformedFingerprint() {

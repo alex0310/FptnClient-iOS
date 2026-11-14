@@ -57,7 +57,11 @@ public struct CertificatePinner: Sendable {
     }
 
     public func verify(leafDER: [UInt8]) throws {
-        guard let expected = expectedFingerprint else { return }
+        guard let expected = expectedFingerprint else {
+            // Fail closed: a missing pin used to skip server authentication
+            // entirely. Strict X.509 validation is the alternative.
+            throw TLSError.missingServerAuthentication
+        }
         let normalizedExpected = CertificateFingerprint.normalized(expected)
         guard normalizedExpected.count == 32 else {
             throw TLSError.invalidConfiguration("certificate fingerprint must be 32 hex digits")

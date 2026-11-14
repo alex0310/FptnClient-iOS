@@ -41,6 +41,9 @@ public struct FPTNClientConfiguration: Sendable {
     public var splitTunnel: SplitTunnel?
     /// Server id (`host:port`) tried before the random login race.
     public var preferredServerID: String?
+    /// `nil` uses the token's MD5 pin; strict X.509 validation is opt-in and
+    /// requires explicit trust anchors.
+    public var certificatePolicy: CertificateValidationPolicy?
 
     public init(
         pool: TunnelPoolConfiguration = TunnelPoolConfiguration(),
@@ -53,7 +56,8 @@ public struct FPTNClientConfiguration: Sendable {
         tunIPv4: IPAddress? = nil,
         tunIPv6: IPAddress? = nil,
         splitTunnel: SplitTunnel? = nil,
-        preferredServerID: String? = nil
+        preferredServerID: String? = nil,
+        certificatePolicy: CertificateValidationPolicy? = nil
     ) {
         self.pool = pool
         self.securityMode = securityMode
@@ -66,6 +70,7 @@ public struct FPTNClientConfiguration: Sendable {
         self.tunIPv6 = tunIPv6
         self.splitTunnel = splitTunnel
         self.preferredServerID = preferredServerID
+        self.certificatePolicy = certificatePolicy
     }
 }
 
@@ -113,7 +118,8 @@ public final class FPTNClient {
             configuration: FPTNAPIConfiguration(clientAgent: configuration.clientAgent),
             transport: apiTransport ?? FPTNAPITransport.transport(
                 securityMode: apiMode,
-                connectTimeout: configuration.connectTimeout
+                connectTimeout: configuration.connectTimeout,
+                certificatePolicy: configuration.certificatePolicy
             )
         )
         self.connector = tunnelConnector ?? Self.defaultConnector(
@@ -254,7 +260,8 @@ public final class FPTNClient {
                 configuration: tunnelConfiguration,
                 connectTimeout: configuration.connectTimeout,
                 clientAgent: configuration.clientAgent,
-                sessionID: sessionID
+                sessionID: sessionID,
+                certificatePolicy: configuration.certificatePolicy
             )
         }
     }

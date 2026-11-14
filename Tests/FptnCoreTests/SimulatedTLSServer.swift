@@ -38,6 +38,11 @@ final class SimulatedTLSServer {
     var sessionIDOverride: [UInt8]?
     var corruptServerFinished = false
     var sendHelloRetryRequest = false
+    /// Strict X.509 tests supply a real chain and a real CertificateVerify
+    /// signature; the defaults keep the existing MD5-pinning tests unchanged.
+    var certificateChainDER: [[UInt8]] = []
+    var certificateVerifyScheme: UInt16 = 0x0403
+    var certificateVerifySigner: (([UInt8]) throws -> [UInt8])?
 
     init(
         suite: TLSCipherSuite = .aes128GcmSha256,
@@ -103,9 +108,12 @@ final class SimulatedTLSServer {
             body: [0x00, 0x00]
         )
         let certificate = certificateMessage()
-        let certificateVerify = certificateVerifyMessage()
         transcript.appendTranscript(encryptedExtensions.encoded())
         transcript.appendTranscript(certificate.encoded())
+        let verifyContent = CertificateVerifyContext.signedContent(
+            transcriptHash: transcript.transcriptHash()
+        )
+        let certificateVerify = try certificateVerifyMessage(signedContent: verifyContent)
         transcript.appendTranscript(certificateVerify.encoded())
 
         let finishedVerify = transcript.finishedVerifyData(
@@ -347,17 +355,20 @@ final class SimulatedTLSServer {
     private func certificateMessage() -> TLSHandshakeMessage {
         var body = ByteWriter()
         body.writeLengthPrefixed8([])
-        var entry = ByteWriter()
-        entry.writeLengthPrefixed24(certificateDER)
-        entry.writeLengthPrefixed16([])
-        body.writeLengthPrefixed24(entry.bytes)
+        var entries = ByteWriter()
+        for der in certificateChainDER.isEmpty ? [certificateDER] : certificateChainDER {
+            entries.writeLengthPrefixed24(der)
+            entries.writeLengthPrefixed16([])
+        }
+        body.writeLengthPrefixed24(entries.bytes)
         return TLSHandshakeMessage(type: .certificate, body: body.bytes)
     }
 
-    private func certificateVerifyMessage() -> TLSHandshakeMessage {
+    private func certificateVerifyMessage(signedContent: [UInt8]) throws -> TLSHandshakeMessage {
         var body = ByteWriter()
-        body.writeUInt16(0x0403)
-        body.writeLengthPrefixed16([0xde, 0xad, 0xbe, 0xef])
+        body.writeUInt16(certificateVerifyScheme)
+        let signature = try certificateVerifySigner?(signedContent) ?? [0xde, 0xad, 0xbe, 0xef]
+        body.writeLengthPrefixed16(signature)
         return TLSHandshakeMessage(type: .certificateVerify, body: body.bytes)
     }
 

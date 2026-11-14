@@ -16,7 +16,9 @@ public enum TLSError: Error, Equatable, LocalizedError {
     case invalidExtension(UInt16)
     case invalidKeyShare
     case emptyCertificateChain
+    case missingServerAuthentication
     case certificatePinMismatch(expected: String, actual: String)
+    case certificateVerifyMismatch
     case serverFinishedMismatch
     case invalidAlert(level: UInt8, description: UInt8)
     case connectionClosed
@@ -41,8 +43,11 @@ public enum TLSError: Error, Equatable, LocalizedError {
         case let .invalidExtension(type): return String(format: "TLS extension 0x%04x is malformed.", type)
         case .invalidKeyShare: return "TLS server sent an invalid key share."
         case .emptyCertificateChain: return "TLS server sent an empty certificate chain."
+        case .missingServerAuthentication:
+            return "No server authentication configured: supply an MD5 pin or strict X.509 trust anchors."
         case let .certificatePinMismatch(expected, actual):
             return "TLS certificate fingerprint mismatch: expected \(expected), got \(actual)."
+        case .certificateVerifyMismatch: return "TLS CertificateVerify signature verification failed."
         case .serverFinishedMismatch: return "TLS server Finished verification failed."
         case let .invalidAlert(level, description):
             return "TLS alert received (level \(level), description \(description))."

@@ -4,7 +4,8 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 459 тестов (358 + 101), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 511 тестов (410 + 101), 0 падений |
+| Строгая цепочка X.509 | Linux, RFC 8448 + сгенерированные DER-фикстуры | DER/X.509/подписи/hostname/цепочка: 0 падений |
 | Токены тем | Linux, golden files | 2 эталона, 0 расхождений |
 | UI-рендеринг тем | `macos-15`, iPhone 16 / iOS 26.2, `xcodebuild test` | 4 теста, 0 падений |
 | `FptnCore` warnings | Linux, `-Xswiftc -warnings-as-errors` | 0 |
@@ -22,7 +23,37 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 358 tests` для `FptnCore` и `Executed 101 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+Последний прогон: `Executed 410 tests` для `FptnCore` и `Executed 101 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+
+## Проверка цепочки сертификатов
+
+- `DER.swift` — строгий DER-декодер (definite length, минимальная длина, OID,
+  UTCTime/GeneralizedTime, BIT STRING, BOOLEAN, запрет хвостов).
+- `X509Certificate.swift` — разбор `TBSCertificate`: issuer/subject, сроки,
+  SPKI, SAN/dNSName, BasicConstraints, KeyUsage, EKU, CN, точные `tbsDER`.
+- `CertificateSignature.swift` — верификация подписей RSA (PKCS#1 v1.5 и PSS),
+  ECDSA P-256/P-384 и Ed25519; `CertificateVerifyContext` строит подписываемое
+  содержимое RFC 8446 §4.4.3.
+- `CertificateChainPolicy.swift` — `X509TrustAnchors`,
+  `CertificateValidationPolicy` (`.pinnedMD5` / `.strictChain`), построение
+  цепочки до якоря, проверка подписей, сроков, CA/`keyCertSign`, EKU
+  `serverAuth` и hostname (точное совпадение и левый `*`).
+- `CertificatePinner` больше не пропускает проверку при `nil`:
+  `TLSError.missingServerAuthentication`.
+- `TLSClientSession` в `.strictChain` верифицирует `CertificateVerify`
+  публичным ключом листа; в `.pinnedMD5` сохраняется поведение upstream.
+- Фикстуры: реальный сертификат из RFC 8448, сгенерированные RSA/ECDSA
+  цепочки, лист с чужим SAN, чужой корень, испорченная подпись, тестовый
+  приватный ключ (только для тестов).
+- Интеграционные тесты `StrictChainHandshakeTests`: успешный handshake с
+  настоящей цепочкой и подписью, отказ при фейковом `CertificateVerify`,
+  чужом корне и неверном hostname.
+- `CertificatePolicyWiringTests` сторожит проброс политики через
+  `FPTNClientConfiguration` → `FPTNTunnelFactory` / `FPTNAPITransport` →
+  `TLSConnectionConfiguration` → `TLSClientConfiguration`.
+
+Публичный CA bundle в репозиторий не входит: в строгом режиме корни задаются
+явно, пустой набор — fail-closed.
 
 ## Тесты тем
 
@@ -192,6 +223,11 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   геометрия (пусто, x 0…1, масштабирование y, clamp, некорректный scale).
 - `TrafficIntegrationTests`: исходники `App/`/`Tunnel/` обязаны содержать
   хуки записи, чтения, истории и отображения метрик/графика.
+- `DERTests`, `X509CertificateTests`, `CertificateChainTests`,
+  `CertificateVerifyTests`, `StrictChainHandshakeTests`,
+  `CertificatePolicyWiringTests`: DER, X.509 (RFC 8448 + RSA/ECDSA фикстуры),
+  подписи, сроки, SAN/wildcard, цепочка до якоря, негативные сценарии,
+  `CertificateVerify` и проброс политики в продакшн-конфигурацию.
 - `ThemeSnapshotTests`: golden-файлы обеих тем, полнота дампа, уникальность,
   диапазон компонентов, fallback, RU/EN названия, WCAG-контраст.
 - `ThemeIntegrationTests`: палитра-адаптер без цветовых литералов, отсутствие
@@ -214,8 +250,15 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   доступен только `swiftc -parse`. Запуск на устройстве не проверялся.
 - `Tools/LiveProbe` не входит в unit-тесты и требует реальный токен/сеть.
 - Переключение языка и тем в живом UI проверяется только на macOS/iOS; Linux-тесты проверяют словари, `Localizer` и токены, а Xcode-тесты — факт рендеринга.
-- Пиксельное совпадение UI с эталонными PNG (сейчас проверяется только непустой рендер и различие тем).
+- Пиксельное совпадение UI с эталонными PNG **осознанно не реализовано**:
+  эталоны зависят от версии iOS, шрифтов и SF Symbols конкретного симулятора.
+  Вместо этого golden-файлы фиксируют точные значения токенов, а Xcode-тесты —
+  непустой рендер и различие тем. Тема UI/snapshot-тестов считается закрытой.
 - Все 19 серверов и длительная работа pool под нагрузкой; live-прогон покрывает по одному серверу на режим.
+- Встроенный публичный CA bundle и системные корни iOS: строгий режим требует
+  явных якорей; поведение с реальными публичными сертификатами на устройстве
+  не проверялось.
+- OCSP/CRL/SCT и проверка отзыва сертификатов.
 - iOS route installation и `NEPacketTunnelFlow` на устройстве.
 - Метрики трафика и график в живом туннеле: запись снимков из extension,
   чтение в app, корректность скоростей при смене сети и реконнекте,

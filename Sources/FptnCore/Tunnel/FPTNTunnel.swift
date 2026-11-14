@@ -283,7 +283,8 @@ public enum FPTNTunnelFactory {
         configuration: FPTNTunnelConfiguration = FPTNTunnelConfiguration(),
         connectTimeout: TimeInterval = 10,
         clientAgent: String = "FptnClient(iOS/1.0.0)",
-        sessionID: String? = nil
+        sessionID: String? = nil,
+        certificatePolicy: CertificateValidationPolicy? = nil
     ) throws -> FPTNTunnel {
         let socket = try POSIXSocket.connect(
             host: server.host,
@@ -295,6 +296,7 @@ public enum FPTNTunnelFactory {
             configuration: TLSConnectionConfiguration(
                 serverName: server.host,
                 expectedCertificateMD5: server.md5Fingerprint,
+                certificatePolicy: certificatePolicy,
                 securityMode: securityMode
             )
         )

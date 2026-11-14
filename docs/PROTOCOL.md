@@ -146,11 +146,13 @@ u8 message_type | поля
 
 - TLS 1.3, cipher suites `0x1301`, `0x1302`, `0x1303`.
 - X25519 key share, HKDF-SHA-256/384, Finished, KeyUpdate.
-- Клиент проверяет pinned MD5 leaf-сертификата, если в токене есть
-  `md5_fingerprint`.
-- `CertificateVerify` не проверяется: подпись сертификата не валидируется,
-  доверие строится на pinned MD5 + TLS Finished. Это осознанное повторение
-  поведения upstream C++ и задокументировано в `SECURITY.md`.
+- Политика `.pinnedMD5` проверяет MD5 листового DER по `md5_fingerprint` из
+  токена и TLS Finished; отсутствие пинна — ошибка, а не «доверять всем».
+  `CertificateVerify` здесь не верифицируется (паритет с upstream C++).
+- Политика `.strictChain` дополнительно строит и проверяет цепочку X.509 до
+  явно заданного корня (сроки, SAN/hostname, CA/EKU, подписи RSA/ECDSA) и
+  верифицирует `CertificateVerify` публичным ключом листа. Подробности — в
+  `SECURITY.md`.
 
 ### FPTN session key
 

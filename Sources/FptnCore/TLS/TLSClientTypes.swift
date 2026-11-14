@@ -5,17 +5,22 @@ public struct TLSClientConfiguration: Sendable {
     public let cipherSuites: [TLSCipherSuite]
     public let expectedCertificateMD5: String?
     public let maxHandshakeSize: Int
+    public let certificatePolicy: CertificateValidationPolicy
 
     public init(
         serverName: String,
         cipherSuites: [TLSCipherSuite] = TLSCipherSuite.allCases,
         expectedCertificateMD5: String? = nil,
-        maxHandshakeSize: Int = 1 << 20
+        maxHandshakeSize: Int = 1 << 20,
+        certificatePolicy: CertificateValidationPolicy? = nil
     ) {
         self.serverName = serverName
         self.cipherSuites = cipherSuites
         self.expectedCertificateMD5 = expectedCertificateMD5
         self.maxHandshakeSize = maxHandshakeSize
+        // Backwards compatible default: an MD5 pin when the token supplies
+        // one, otherwise no silent trust (the pinner fails closed).
+        self.certificatePolicy = certificatePolicy ?? .pinnedMD5(expectedCertificateMD5)
     }
 }
 

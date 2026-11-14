@@ -61,7 +61,10 @@ open FptnClient.xcodeproj
 
 - Разбор токенов `fptn:`, `fptn://`, `fptnb:` (Brotli) и `censored_zone_servers`.
 - Собственный TLS 1.3-клиент: ClientHello, X25519, HKDF, AES-GCM/ChaCha20-Poly1305,
-  Finished, KeyUpdate, фрагментация, pinned MD5 leaf-сертификата.
+  Finished, KeyUpdate, фрагментация. Две политики аутентификации: pinned MD5
+  leaf (upstream FPTN) и строгая цепочка X.509 с DER-парсером, проверкой
+  подписей RSA/ECDSA, сроков, SAN/hostname, CA/EKU и `CertificateVerify`.
+  Отсутствие пинна больше не означает доверие без проверки.
 - Три режима маскировки: plain SNI, TLS obfuscation (`TlsObfuscator2`) и reality
   с decoy ClientHello/ServerHello.
 - HTTP/1.1 API (`/api/v1/login`, `/api/v1/dns`) и WebSocket upgrade на `/api/v1/fptn`.
@@ -101,7 +104,7 @@ open FptnClient.xcodeproj
   (линии, заливка, сетка, легенда — в цветах активной темы). RU/EN подписи,
   новый `sessionID` на каждое подключение.
 - Весь Swift-пакет собирается в **Swift 6 language mode** без предупреждений;
-  459 unit-тестов проходят на Linux, плюс Xcode UI-тесты рендеринга обеих тем.
+  511 unit-тестов проходят на Linux, плюс Xcode UI-тесты рендеринга обеих тем.
 
 ## Ограничения
 

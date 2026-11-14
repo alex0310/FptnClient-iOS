@@ -18,6 +18,9 @@ public enum FPTNSecurityMode: String, CaseIterable, Sendable {
 public struct TLSConnectionConfiguration: Sendable {
     public var serverName: String
     public var expectedCertificateMD5: String?
+    /// `nil` keeps the upstream MD5-pinning behaviour derived from
+    /// `expectedCertificateMD5`; a strict policy enables full X.509 validation.
+    public var certificatePolicy: CertificateValidationPolicy?
     public var cipherSuites: [TLSCipherSuite]
     public var securityMode: FPTNSecurityMode
     public var handshakeTimeout: TimeInterval
@@ -31,6 +34,7 @@ public struct TLSConnectionConfiguration: Sendable {
     public init(
         serverName: String,
         expectedCertificateMD5: String? = nil,
+        certificatePolicy: CertificateValidationPolicy? = nil,
         cipherSuites: [TLSCipherSuite] = TLSCipherSuite.allCases,
         securityMode: FPTNSecurityMode = .plain,
         handshakeTimeout: TimeInterval = 10,
@@ -43,6 +47,7 @@ public struct TLSConnectionConfiguration: Sendable {
     ) {
         self.serverName = serverName
         self.expectedCertificateMD5 = expectedCertificateMD5
+        self.certificatePolicy = certificatePolicy
         self.cipherSuites = cipherSuites
         self.securityMode = securityMode
         self.handshakeTimeout = handshakeTimeout
@@ -104,7 +109,8 @@ public final class TLSConnection: HTTPConnection, ByteTransport {
             configuration: TLSClientConfiguration(
                 serverName: configuration.serverName,
                 cipherSuites: configuration.cipherSuites,
-                expectedCertificateMD5: configuration.expectedCertificateMD5
+                expectedCertificateMD5: configuration.expectedCertificateMD5,
+                certificatePolicy: configuration.certificatePolicy
             ),
             clientRandom: clientRandom,
             sessionIDRandom: sessionIDRandom,

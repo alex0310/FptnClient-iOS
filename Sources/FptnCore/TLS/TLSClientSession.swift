@@ -8,10 +8,11 @@ import Crypto
 
 /// A minimal TLS 1.3 client tailored for FPTN.
 ///
-/// The client deliberately skips `CertificateVerify` signature validation. FPTN
-/// authenticates the server by pinning the MD5 fingerprint of the leaf
-/// certificate and by validating the TLS `Finished` message, matching the
-/// upstream C++ implementation. See `docs/tls.md` for the security rationale.
+/// Authentication follows `CertificateValidationPolicy`: the default
+/// `.pinnedMD5` matches upstream C++ (MD5 leaf pin + TLS Finished), while
+/// `.strictChain` performs full X.509 path validation and verifies the
+/// `CertificateVerify` signature with the leaf public key. See
+/// `docs/SECURITY.md` for the trust model.
 public final class TLSClientSession {
     public let clientRandom: [UInt8]
     public let sessionID: [UInt8]
@@ -24,7 +25,8 @@ public final class TLSClientSession {
     private let privateKey: Curve25519.KeyAgreement.PrivateKey
     private let recordDecoder: TLSRecordDecoder
     private let handshakeDecoder: TLSHandshakeDecoder
-    private let pinner: CertificatePinner
+    private let policy: CertificateValidationPolicy
+    private var leafCertificate: X509Certificate?
 
     private var keySchedule: TLSKeySchedule?
     private var trafficSecrets: TLSTrafficSecrets?
@@ -78,9 +80,7 @@ public final class TLSClientSession {
         self.handshakeDecoder = TLSHandshakeDecoder(
             maxHandshakeSize: configuration.maxHandshakeSize
         )
-        self.pinner = CertificatePinner(
-            expectedFingerprint: configuration.expectedCertificateMD5
-        )
+        self.policy = configuration.certificatePolicy
     }
 
     /// Produces the ClientHello and a compatibility ChangeCipherSpec record.
@@ -229,8 +229,12 @@ public final class TLSClientSession {
                 guard phase == .waitCertificate else {
                     throw TLSError.unexpectedMessage("Certificate")
                 }
-                let leaf = try TLSCertificateMessage.leafDER(from: message)
-                try pinner.verify(leafDER: leaf)
+                let entries = try TLSCertificateMessage.parse(message)
+                leafCertificate = try CertificateAuthenticator.verify(
+                    chainDER: entries.map(\.der),
+                    hostname: configuration.serverName,
+                    policy: policy
+                )
                 appendTranscript(message.encoded())
                 phase = .waitCertificateVerify
             case .certificateVerify:
@@ -333,13 +337,30 @@ public final class TLSClientSession {
 
     private func validateCertificateVerify(_ message: TLSHandshakeMessage) throws {
         var reader = ByteReader(message.body)
-        _ = try reader.readUInt16()
+        let schemeRaw = try reader.readUInt16()
         let signature = try reader.readLengthPrefixed16()
         guard !signature.isEmpty, reader.isAtEnd else {
             throw TLSError.unexpectedMessage("malformed CertificateVerify")
         }
-        // Signature verification is intentionally skipped: FPTN pins the leaf
-        // certificate by MD5 and relies on the TLS Finished check.
+        guard case .strictChain = policy else {
+            // Upstream FPTN behaviour: the MD5 pin plus TLS Finished are the
+            // only authentication when strict X.509 validation is disabled.
+            return
+        }
+        guard let leaf = leafCertificate,
+              let hash = keySchedule?.transcriptHash(),
+              let scheme = TLSSignatureScheme(rawValue: schemeRaw) else {
+            throw TLSError.invalidState("missing data for CertificateVerify")
+        }
+        let signedContent = CertificateVerifyContext.signedContent(transcriptHash: hash)
+        guard try CertificateSignature.verifyCertificateVerify(
+            signature: signature,
+            scheme: scheme,
+            signedContent: signedContent,
+            leaf: leaf
+        ) else {
+            throw TLSError.certificateVerifyMismatch
+        }
     }
 
     private func handleServerFinished(

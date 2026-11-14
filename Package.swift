@@ -21,6 +21,7 @@ let package = Package(
             name: "FptnCore",
             dependencies: [
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
                 .product(name: "SwiftBrotli", package: "SwiftBrotli")
             ]
         ),
@@ -31,7 +32,11 @@ let package = Package(
         ),
         .testTarget(
             name: "FptnCoreTests",
-            dependencies: ["FptnCore"]
+            dependencies: [
+                "FptnCore",
+                .product(name: "_CryptoExtras", package: "swift-crypto")
+            ],
+            resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "FptnSharedTests",
