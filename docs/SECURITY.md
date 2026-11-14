@@ -59,9 +59,34 @@ CA bundle в репозиторий **намеренно не вендоритс
 Тестовые цепочки лежат в `Tests/FptnCoreTests/Fixtures/`.
 `rsa-leaf-key.pem` — одноразовый тестовый ключ, в приложение не попадает.
 
+## Дополнительные проверки сертификата
+
+`CertificateSecurityOptions` применяется после основной политики и по
+умолчанию выключен. Все проверки fail-closed при явном требовании.
+
+- **SPKI-pinning.** SHA-256 от DER `SubjectPublicKeyInfo` листа (hex или base64),
+  constant-time сравнение. Пин задаётся конфигурацией или полем `spki_sha256`
+  сервера в токене. В отличие от MD5 leaf, переживает перевыпуск сертификата
+  на том же ключе и не использует слабый хэш.
+- **OCSP.** Разбор `BasicOCSPResponse`: статус good/revoked/unknown, серийный
+  номер, `thisUpdate`/`nextUpdate`, подпись responder'а (его сертификат из
+  ответа или издатель). Поддерживается TLS stapling (`status_request`, type 5).
+- **CRL.** Разбор `CertificateList`: издатель, окно действия, отозванные
+  серийные номера, подпись издателя. Из сертификата извлекаются
+  `crlDistributionPoints` и OCSP-URI из AIA.
+- **SCT / Certificate Transparency.** RFC 6962 v1 SCT из TLS extension 18 и
+  X.509 SCT extension; проверка подписи доверенным CT-логом, времени выпуска и
+  минимального числа валидных SCT (`CTPolicy`).
+
+Сетевых запросов внутри handshake нет: в этот момент сеть уже туннелируется, и
+обращение к CRL/OCSP-серверу через туннель было бы циклическим. Данные об
+отзыве и список CT-логов предоставляет вызывающий код; приложение может
+обновлять их заранее и передавать в `FPTNClientConfiguration`.
+
 ## Токен
 
 Токен — bearer-credential: он содержит username/password и список серверов.
+У каждого сервера могут быть `md5_fingerprint` и `spki_sha256`.
 
 Приложение хранит его в Keychain как generic password:
 
@@ -123,8 +148,8 @@ multicast, IPv6 ULA/link-local/multicast) добавляются всегда и
 
 - Проверка `.systemTrust` на реальном iOS-устройстве с публичным сертификатом
   (CI проверяет только сборку `SecTrust`-кода на симуляторе).
-- Certificate pinning по SPKI.
-- Проверка статуса отзыва (OCSP/CRL) и SCT.
+- Сетевая загрузка OCSP/CRL и встроенный список доверенных CT-логов
+  (сейчас данные и логи передаёт вызывающий код).
 - Защита от downgrade режима маскировки.
 - Общий Keychain access group для приложения и расширения.
 - Аудит сторонних зависимостей (`swift-crypto`, `SwiftBrotli`).

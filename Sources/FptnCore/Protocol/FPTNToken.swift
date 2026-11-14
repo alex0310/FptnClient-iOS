@@ -7,6 +7,8 @@ public struct FPTNServer: Equatable, Hashable, Sendable {
     public let host: String
     public let port: UInt16
     public let md5Fingerprint: String?
+    /// SHA-256 of the leaf `SubjectPublicKeyInfo` (hex or base64).
+    public let spkiSHA256: String?
     public let countryCode: String?
     public let isCensoredZone: Bool
 
@@ -16,7 +18,8 @@ public struct FPTNServer: Equatable, Hashable, Sendable {
         port: UInt16,
         md5Fingerprint: String?,
         countryCode: String?,
-        isCensoredZone: Bool
+        isCensoredZone: Bool,
+        spkiSHA256: String? = nil
     ) {
         self.name = name
         self.host = host
@@ -24,6 +27,7 @@ public struct FPTNServer: Equatable, Hashable, Sendable {
         self.md5Fingerprint = md5Fingerprint
         self.countryCode = countryCode
         self.isCensoredZone = isCensoredZone
+        self.spkiSHA256 = spkiSHA256
     }
 
     public var id: String { "\(host):\(port)" }
@@ -172,7 +176,8 @@ public enum TokenParser {
             port: UInt16(port),
             md5Fingerprint: server.md5Fingerprint?.lowercased(),
             countryCode: server.countryCode,
-            isCensoredZone: censored
+            isCensoredZone: censored,
+            spkiSHA256: server.spkiSHA256?.lowercased()
         )
     }
 }
@@ -202,6 +207,7 @@ private struct WireServer: Decodable {
     let host: String?
     let port: Int?
     let md5Fingerprint: String?
+    let spkiSHA256: String?
     let countryCode: String?
 
     enum CodingKeys: String, CodingKey {
@@ -209,6 +215,7 @@ private struct WireServer: Decodable {
         case host
         case port
         case md5Fingerprint = "md5_fingerprint"
+        case spkiSHA256 = "spki_sha256"
         case countryCode = "country_code"
     }
 }

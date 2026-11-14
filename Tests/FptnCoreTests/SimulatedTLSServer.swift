@@ -43,6 +43,8 @@ final class SimulatedTLSServer {
     var certificateChainDER: [[UInt8]] = []
     var certificateVerifyScheme: UInt16 = 0x0403
     var certificateVerifySigner: (([UInt8]) throws -> [UInt8])?
+    /// TLS 1.3 CertificateEntry extensions (OCSP stapling, SCT list).
+    var certificateEntryExtensions: [UInt16: [UInt8]] = [:]
 
     init(
         suite: TLSCipherSuite = .aes128GcmSha256,
@@ -355,10 +357,14 @@ final class SimulatedTLSServer {
     private func certificateMessage() -> TLSHandshakeMessage {
         var body = ByteWriter()
         body.writeLengthPrefixed8([])
+        let leafExtensions = certificateEntryExtensions
+            .sorted { $0.key < $1.key }
+            .flatMap { TLSExtension(type: $0.key, data: $0.value).encoded() }
         var entries = ByteWriter()
-        for der in certificateChainDER.isEmpty ? [certificateDER] : certificateChainDER {
+        let chain = certificateChainDER.isEmpty ? [certificateDER] : certificateChainDER
+        for (index, der) in chain.enumerated() {
             entries.writeLengthPrefixed24(der)
-            entries.writeLengthPrefixed16([])
+            entries.writeLengthPrefixed16(index == 0 ? leafExtensions : [])
         }
         body.writeLengthPrefixed24(entries.bytes)
         return TLSHandshakeMessage(type: .certificate, body: body.bytes)

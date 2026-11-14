@@ -184,28 +184,47 @@ public enum CertificateAuthenticator {
         hostname: String,
         policy: CertificateValidationPolicy,
         now: Date = Date(),
-        systemAnchors: X509TrustAnchors? = nil
+        systemAnchors: X509TrustAnchors? = nil,
+        security: CertificateSecurityOptions = .default,
+        stapledOCSPDER: [UInt8]? = nil,
+        tlsSCTList: [UInt8]? = nil
     ) throws -> X509Certificate? {
+        let leaf: X509Certificate?
         switch policy {
         case let .pinnedMD5(fingerprint):
-            guard let leaf = chainDER.first else { throw CertificateChainError.emptyChain }
-            try CertificatePinner(expectedFingerprint: fingerprint).verify(leafDER: leaf)
-            return nil
+            guard let first = chainDER.first else { throw CertificateChainError.emptyChain }
+            try CertificatePinner(expectedFingerprint: fingerprint).verify(leafDER: first)
+            leaf = nil
         case let .strictChain(anchors):
-            return try CertificateChainValidator.validate(
+            leaf = try CertificateChainValidator.validate(
                 chainDER: chainDER,
                 hostname: hostname,
                 anchors: anchors,
                 now: now
             )
         case .systemTrust:
-            return try verifySystemTrust(
+            leaf = try verifySystemTrust(
                 chainDER: chainDER,
                 hostname: hostname,
                 now: now,
                 systemAnchors: systemAnchors
             )
         }
+
+        let chain: [X509Certificate] = security.isEnabled
+            ? (try chainDER.map { try X509Certificate(der: $0) })
+            : []
+        let issuer: X509Certificate? = chain.count > 1 ? chain[1] : nil
+        try CertificateSecurity.verify(
+            chainDER: chainDER,
+            chain: chain,
+            issuer: issuer,
+            options: security,
+            stapledOCSPDER: stapledOCSPDER,
+            tlsSCTList: tlsSCTList,
+            now: now
+        )
+        return leaf
     }
 
     private static func verifySystemTrust(

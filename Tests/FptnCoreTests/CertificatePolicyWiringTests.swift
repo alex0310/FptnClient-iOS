@@ -16,8 +16,12 @@ final class CertificatePolicyWiringTests: XCTestCase {
     func testTLSClientSessionUsesAuthenticatorAndCertificateVerify() throws {
         let session = try source("Sources/FptnCore/TLS/TLSClientSession.swift")
         XCTAssertTrue(session.contains("CertificateAuthenticator.verify"))
-        XCTAssertTrue(session.contains("CertificateSignature.verifyCertificateVerify"))
+        XCTAssertTrue(session.contains("TLSCertificateVerifyValidation.verify"))
         XCTAssertFalse(session.contains("Signature verification is intentionally skipped"))
+        let validation = try source(
+            "Sources/FptnCore/TLS/TLSCertificateVerifyValidation.swift"
+        )
+        XCTAssertTrue(validation.contains("CertificateSignature.verifyCertificateVerify"))
     }
 
     func testConnectionConfigurationForwardsPolicy() throws {
@@ -48,5 +52,19 @@ final class CertificatePolicyWiringTests: XCTestCase {
         let trust = try source("Sources/FptnCore/TLS/SystemTrust.swift")
         XCTAssertTrue(trust.contains("SecTrustEvaluateWithError"))
         XCTAssertTrue(trust.contains("ca-certificates.crt"))
+    }
+
+    func testCertificateSecurityOptionsAreWired() throws {
+        let session = try source("Sources/FptnCore/TLS/TLSClientSession.swift")
+        XCTAssertTrue(session.contains("certificateSecurity"))
+        XCTAssertTrue(session.contains("TLSCertificateEntryExtensions.parse"))
+        let tunnel = try source("Sources/FptnCore/Tunnel/FPTNTunnel.swift")
+        XCTAssertTrue(tunnel.contains("certificateSecurity"))
+        let api = try source("Sources/FptnCore/Transport/FPTNAPITransport.swift")
+        XCTAssertTrue(api.contains("certificateSecurity"))
+        let client = try source("Sources/FptnCore/Tunnel/FPTNClient.swift")
+        XCTAssertTrue(client.contains("certificateSecurity"))
+        let token = try source("Sources/FptnCore/Protocol/FPTNToken.swift")
+        XCTAssertTrue(token.contains("spki_sha256"))
     }
 }

@@ -30,6 +30,7 @@
       "host": "vpn.example.com",
       "port": 443,
       "md5_fingerprint": "…",
+      "spki_sha256": "…",
       "country_code": "FI"
     }
   ],
@@ -39,7 +40,9 @@
 
 `censored_zone_servers` добавляются к общему списку с флагом
 `isCensoredZone`. В Swift-клиенте reality-режим выбирается настройкой, а не
-автоматически по флагу; флаг отображается в UI.
+автоматически по флагу; флаг отображается в UI. `spki_sha256` — необязательный
+SHA-256 (hex или base64) от DER `SubjectPublicKeyInfo` листа; используется
+для SPKI-пиннинга, если TLS-политика включает дополнительные проверки.
 
 ## 2. Control plane
 

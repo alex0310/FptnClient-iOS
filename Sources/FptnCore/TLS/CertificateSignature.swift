@@ -34,31 +34,46 @@ public enum CertificateSignature {
         certificate: X509Certificate,
         issuer: X509Certificate
     ) throws -> Bool {
-        let oid = certificate.signatureAlgorithmOID
-        guard X509OID.isSupportedCertificateSignature(oid) else {
-            throw CertificateSignatureError.unsupportedAlgorithm(oid)
+        try verify(
+            signedData: certificate.tbsDER,
+            signature: certificate.signature,
+            algorithmOID: certificate.signatureAlgorithmOID,
+            issuer: issuer
+        )
+    }
+
+    /// Verifies arbitrary signed bytes with an issuer's public key. Used by
+    /// X.509 certificates, CRLs and OCSP responses.
+    public static func verify(
+        signedData: [UInt8],
+        signature: [UInt8],
+        algorithmOID: String,
+        issuer: X509Certificate
+    ) throws -> Bool {
+        guard X509OID.isSupportedCertificateSignature(algorithmOID) else {
+            throw CertificateSignatureError.unsupportedAlgorithm(algorithmOID)
         }
         switch issuer.publicKeyAlgorithmOID {
         case X509OID.rsaEncryption:
             return try verifyRSA(
-                signedData: Data(certificate.tbsDER),
-                signature: certificate.signature,
+                signedData: Data(signedData),
+                signature: signature,
                 publicKeyDER: issuer.subjectPublicKeyInfoDER,
-                algorithmOID: oid,
+                algorithmOID: algorithmOID,
                 padding: .insecurePKCS1v1_5
             )
         case X509OID.ecPublicKey:
             return try verifyECDSA(
-                signedData: Data(certificate.tbsDER),
-                signature: certificate.signature,
+                signedData: Data(signedData),
+                signature: signature,
                 publicKeyBytes: issuer.publicKeyBytes,
                 curveOID: issuer.publicKeyCurveOID,
-                algorithmOID: oid
+                algorithmOID: algorithmOID
             )
         case X509OID.ed25519:
             return try verifyEd25519(
-                signedData: Data(certificate.tbsDER),
-                signature: certificate.signature,
+                signedData: Data(signedData),
+                signature: signature,
                 publicKeyBytes: issuer.publicKeyBytes
             )
         default:

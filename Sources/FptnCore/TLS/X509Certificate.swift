@@ -23,6 +23,14 @@ public struct X509Certificate: Equatable, Sendable {
     public let keyUsageBits: UInt16
     public let extendedKeyUsages: [String]
     public let extensionOIDs: [String]
+    /// Raw INTEGER content of the serial number (used by CRL/OCSP).
+    public let serialNumber: [UInt8]
+    /// CRL distribution point URIs (extension 2.5.29.31).
+    public let crlDistributionPoints: [String]
+    /// OCSP responder URIs (Authority Information Access).
+    public let ocspURLs: [String]
+    /// TLS-encoded SCT list embedded in the certificate, if present.
+    public let embeddedSCTList: [UInt8]?
 
     public init(der: [UInt8]) throws {
         self.der = der
@@ -43,6 +51,7 @@ public struct X509Certificate: Equatable, Sendable {
         var index = 0
         if tbsFields.first?.tag == 0xa0 { index += 1 }  // [0] EXPLICIT version
         guard tbsFields.count >= index + 6 else { throw DERError.truncated }
+        serialNumber = try tbsFields[index].requireTag(0x02).content
         index += 1  // serialNumber
         index += 1  // signature AlgorithmIdentifier (matches outer algorithm)
         issuerDER = tbsFields[index].encoded
@@ -73,6 +82,9 @@ public struct X509Certificate: Equatable, Sendable {
         var parsedKeyUsage: UInt16 = 0
         var parsedEKUs: [String] = []
         var parsedExtensionOIDs: [String] = []
+        var parsedCRLDPs: [String] = []
+        var parsedOCSPURLs: [String] = []
+        var parsedSCTList: [UInt8]?
         if let extensionsField = tbsFields[safe: index], extensionsField.tag == 0xa3 {
             let sequence = try DER.parse(extensionsField.content)
             for extensionElement in try sequence.children {
@@ -103,6 +115,15 @@ public struct X509Certificate: Equatable, Sendable {
                 case X509OID.extKeyUsage:
                     parsedEKUs = try DER.parse(valueElement.content).children
                         .compactMap { try? $0.objectIdentifier }
+                case X509OID.crlDistributionPoints:
+                    parsedCRLDPs = try Self.collectURIs(in: DER.parse(valueElement.content))
+                case X509OID.authorityInfoAccess:
+                    parsedOCSPURLs = try Self.ocspResponderURIs(
+                        in: DER.parse(valueElement.content)
+                    )
+                case X509OID.signedCertificateTimestamp:
+                    let inner = try DER.parse(valueElement.content)
+                    if inner.tag == 0x04 { parsedSCTList = inner.content }
                 default:
                     break
                 }
@@ -113,6 +134,9 @@ public struct X509Certificate: Equatable, Sendable {
         keyUsageBits = parsedKeyUsage
         extendedKeyUsages = parsedEKUs
         extensionOIDs = parsedExtensionOIDs
+        crlDistributionPoints = parsedCRLDPs
+        ocspURLs = parsedOCSPURLs
+        embeddedSCTList = parsedSCTList
     }
 
     public func isValid(at now: Date) -> Bool {
@@ -128,6 +152,33 @@ public struct X509Certificate: Equatable, Sendable {
         extendedKeyUsages.isEmpty
             || extendedKeyUsages.contains(X509OID.serverAuth)
             || extendedKeyUsages.contains(X509OID.anyExtendedKeyUsage)
+    }
+
+    /// Recursively collects `uniformResourceIdentifier` GeneralNames (0x86).
+    private static func collectURIs(in element: DERElement) throws -> [String] {
+        var result: [String] = []
+        if element.tag == 0x86, let uri = try? element.text {
+            result.append(uri)
+        }
+        if element.tag & 0x20 != 0 || element.tag == 0x30 || element.tag == 0x31 {
+            for child in try element.children {
+                result.append(contentsOf: try collectURIs(in: child))
+            }
+        }
+        return result
+    }
+
+    private static func ocspResponderURIs(in element: DERElement) throws -> [String] {
+        var result: [String] = []
+        for description in try element.children {
+            let parts = try description.children
+            guard parts.count >= 2,
+                  (try? parts[0].objectIdentifier) == X509OID.ocspAccessMethod else {
+                continue
+            }
+            result.append(contentsOf: try collectURIs(in: parts[1]))
+        }
+        return result
     }
 
     private static func findCommonName(in name: DERElement) throws -> String? {

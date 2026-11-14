@@ -230,10 +230,26 @@ public final class TLSClientSession {
                     throw TLSError.unexpectedMessage("Certificate")
                 }
                 let entries = try TLSCertificateMessage.parse(message)
+                let entryExtensions = try TLSCertificateEntryExtensions.parse(
+                    entries[0].extensions
+                )
+                var stapledOCSP: [UInt8]?
+                if let statusData = entryExtensions[
+                    TLSCertificateEntryExtensions.statusRequest
+                ], !statusData.isEmpty {
+                    stapledOCSP = try TLSCertificateEntryExtensions.ocspResponse(
+                        from: statusData
+                    )
+                }
                 leafCertificate = try CertificateAuthenticator.verify(
                     chainDER: entries.map(\.der),
                     hostname: configuration.serverName,
-                    policy: policy
+                    policy: policy,
+                    security: configuration.certificateSecurity,
+                    stapledOCSPDER: stapledOCSP,
+                    tlsSCTList: entryExtensions[
+                        TLSCertificateEntryExtensions.signedCertificateTimestamp
+                    ]
                 )
                 appendTranscript(message.encoded())
                 phase = .waitCertificateVerify
@@ -336,34 +352,12 @@ public final class TLSClientSession {
     }
 
     private func validateCertificateVerify(_ message: TLSHandshakeMessage) throws {
-        var reader = ByteReader(message.body)
-        let schemeRaw = try reader.readUInt16()
-        let signature = try reader.readLengthPrefixed16()
-        guard !signature.isEmpty, reader.isAtEnd else {
-            throw TLSError.unexpectedMessage("malformed CertificateVerify")
-        }
-        switch policy {
-        case .pinnedMD5:
-            // Upstream FPTN behaviour: the MD5 pin plus TLS Finished are the
-            // only authentication when strict X.509 validation is disabled.
-            return
-        case .strictChain, .systemTrust:
-            break
-        }
-        guard let leaf = leafCertificate,
-              let hash = keySchedule?.transcriptHash(),
-              let scheme = TLSSignatureScheme(rawValue: schemeRaw) else {
-            throw TLSError.invalidState("missing data for CertificateVerify")
-        }
-        let signedContent = CertificateVerifyContext.signedContent(transcriptHash: hash)
-        guard try CertificateSignature.verifyCertificateVerify(
-            signature: signature,
-            scheme: scheme,
-            signedContent: signedContent,
-            leaf: leaf
-        ) else {
-            throw TLSError.certificateVerifyMismatch
-        }
+        try TLSCertificateVerifyValidation.verify(
+            message: message,
+            policy: policy,
+            leaf: leafCertificate,
+            transcriptHash: keySchedule?.transcriptHash()
+        )
     }
 
     private func handleServerFinished(

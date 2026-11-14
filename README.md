@@ -65,7 +65,9 @@ open FptnClient.xcodeproj
   leaf (upstream FPTN), строгая цепочка X.509 с DER-парсером, проверкой
   подписей RSA/ECDSA, сроков, SAN/hostname, CA/EKU и `CertificateVerify`,
   а также `.systemTrust` (`SecTrust` на iOS, системный PEM-бандл на Linux).
-  Отсутствие пинна по умолчанию включает системное доверие.
+  Отсутствие пинна по умолчанию включает системное доверие. Дополнительно:
+  SPKI-pinning (`spki_sha256` в токене), OCSP (включая stapling), CRL и
+  SCT/Certificate Transparency с проверкой подписей и сроков.
 - Три режима маскировки: plain SNI, TLS obfuscation (`TlsObfuscator2`) и reality
   с decoy ClientHello/ServerHello.
 - HTTP/1.1 API (`/api/v1/login`, `/api/v1/dns`) и WebSocket upgrade на `/api/v1/fptn`.
@@ -105,7 +107,7 @@ open FptnClient.xcodeproj
   (линии, заливка, сетка, легенда — в цветах активной темы). RU/EN подписи,
   новый `sessionID` на каждое подключение.
 - Весь Swift-пакет собирается в **Swift 6 language mode** без предупреждений;
-  527 unit-тестов проходят на Linux, плюс Xcode UI-тесты рендеринга обеих тем.
+  572 unit-теста проходят на Linux, плюс Xcode UI-тесты рендеринга обеих тем.
 
 ## Ограничения
 

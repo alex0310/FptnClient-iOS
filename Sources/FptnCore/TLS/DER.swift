@@ -88,7 +88,8 @@ public struct DERElement: Equatable, Sendable {
         get throws {
             switch tag {
             // 0x82 is the context-specific IA5String used by X.509 dNSName.
-            case 0x0c, 0x13, 0x16, 0x17, 0x18, 0x14, 0x82:
+            // 0x82 = X.509 dNSName, 0x86 = uniformResourceIdentifier.
+            case 0x0c, 0x13, 0x16, 0x17, 0x18, 0x14, 0x82, 0x86:
                 guard let value = String(bytes: content, encoding: .utf8) else {
                     throw DERError.unsupportedString(tag)
                 }

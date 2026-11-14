@@ -8,7 +8,8 @@ public enum FPTNAPITransport {
         securityMode: FPTNSecurityMode = .plain,
         connectTimeout: TimeInterval = 10,
         readTimeout: TimeInterval = 10,
-        certificatePolicy: CertificateValidationPolicy? = nil
+        certificatePolicy: CertificateValidationPolicy? = nil,
+        certificateSecurity: CertificateSecurityOptions = .default
     ) -> FPTNAPIClient.Transport {
         { request, server in
             let socket = try POSIXSocket.connect(
@@ -22,6 +23,7 @@ public enum FPTNAPITransport {
                     serverName: server.host,
                     expectedCertificateMD5: server.md5Fingerprint,
                     certificatePolicy: certificatePolicy,
+                    certificateSecurity: certificateSecurity.addingSPKIPin(server.spkiSHA256),
                     securityMode: securityMode,
                     handshakeTimeout: connectTimeout,
                     readTimeout: readTimeout,

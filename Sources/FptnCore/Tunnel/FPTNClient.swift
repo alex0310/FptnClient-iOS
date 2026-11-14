@@ -44,6 +44,8 @@ public struct FPTNClientConfiguration: Sendable {
     /// `nil` uses the token's MD5 pin; strict X.509 validation is opt-in and
     /// requires explicit trust anchors.
     public var certificatePolicy: CertificateValidationPolicy?
+    /// SPKI pins, OCSP/CRL data and CT policy applied after the main policy.
+    public var certificateSecurity: CertificateSecurityOptions
 
     public init(
         pool: TunnelPoolConfiguration = TunnelPoolConfiguration(),
@@ -57,7 +59,8 @@ public struct FPTNClientConfiguration: Sendable {
         tunIPv6: IPAddress? = nil,
         splitTunnel: SplitTunnel? = nil,
         preferredServerID: String? = nil,
-        certificatePolicy: CertificateValidationPolicy? = nil
+        certificatePolicy: CertificateValidationPolicy? = nil,
+        certificateSecurity: CertificateSecurityOptions = .default
     ) {
         self.pool = pool
         self.securityMode = securityMode
@@ -71,6 +74,7 @@ public struct FPTNClientConfiguration: Sendable {
         self.splitTunnel = splitTunnel
         self.preferredServerID = preferredServerID
         self.certificatePolicy = certificatePolicy
+        self.certificateSecurity = certificateSecurity
     }
 }
 
@@ -119,7 +123,8 @@ public final class FPTNClient {
             transport: apiTransport ?? FPTNAPITransport.transport(
                 securityMode: apiMode,
                 connectTimeout: configuration.connectTimeout,
-                certificatePolicy: configuration.certificatePolicy
+                certificatePolicy: configuration.certificatePolicy,
+                certificateSecurity: configuration.certificateSecurity
             )
         )
         self.connector = tunnelConnector ?? Self.defaultConnector(
@@ -261,7 +266,9 @@ public final class FPTNClient {
                 connectTimeout: configuration.connectTimeout,
                 clientAgent: configuration.clientAgent,
                 sessionID: sessionID,
-                certificatePolicy: configuration.certificatePolicy
+                certificatePolicy: configuration.certificatePolicy,
+                certificateSecurity: configuration.certificateSecurity
+                    .addingSPKIPin(server.spkiSHA256)
             )
         }
     }

@@ -36,6 +36,32 @@ public enum TLSCertificateMessage {
     }
 }
 
+/// Extensions attached to a single TLS 1.3 `CertificateEntry`. Unlike
+/// `TLSExtensions`, `Entry.extensions` already excludes the outer u16 length.
+public enum TLSCertificateEntryExtensions {
+    public static let statusRequest: UInt16 = 0x0005
+    public static let signedCertificateTimestamp: UInt16 = 0x0012
+
+    public static func parse(_ bytes: [UInt8]) throws -> [UInt16: [UInt8]] {
+        var reader = ByteReader(bytes)
+        var result: [UInt16: [UInt8]] = [:]
+        while !reader.isAtEnd {
+            let type = try reader.readUInt16()
+            let data = try reader.readLengthPrefixed16()
+            guard result[type] == nil else { throw TLSError.invalidExtension(type) }
+            result[type] = data
+        }
+        return result
+    }
+
+    /// `status_request` payload: status_type (1 = ocsp) + u24 OCSP response.
+    public static func ocspResponse(from data: [UInt8]) throws -> [UInt8]? {
+        var reader = ByteReader(data)
+        guard try reader.readUInt8() == 1 else { return nil }
+        return try reader.readLengthPrefixed24()
+    }
+}
+
 public enum CertificateFingerprint {
     /// FPTN pins certificates by the lowercase MD5 fingerprint of the DER leaf.
     public static func md5(of der: [UInt8]) -> String {

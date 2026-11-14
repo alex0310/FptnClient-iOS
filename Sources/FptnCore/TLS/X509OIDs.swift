@@ -28,10 +28,16 @@ public enum X509OID {
     public static let basicConstraints = "2.5.29.19"
     public static let authorityKeyIdentifier = "2.5.29.35"
     public static let extKeyUsage = "2.5.29.37"
+    public static let crlDistributionPoints = "2.5.29.31"
+    public static let authorityInfoAccess = "1.3.6.1.5.5.7.1.1"
+    public static let signedCertificateTimestamp = "1.3.6.1.4.1.11129.2.4.2"
 
     // Extended key usages
     public static let serverAuth = "1.3.6.1.5.5.7.3.1"
     public static let anyExtendedKeyUsage = "2.5.29.37.0"
+
+    // Authority Information Access methods
+    public static let ocspAccessMethod = "1.3.6.1.5.5.7.48.1"
 
     // Attribute types
     public static let commonName = "2.5.4.3"

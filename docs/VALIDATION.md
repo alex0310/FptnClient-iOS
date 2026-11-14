@@ -4,7 +4,8 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 527 тестов (426 + 101), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 572 теста (471 + 101), 0 падений |
+| SPKI / OCSP / CRL / SCT | Linux, подписанные DER-фикстуры | парсеры, подписи, сроки, статусы |
 | Системные корни | Linux, OS PEM bundle / iOS `SecTrust` | загрузка, разбор, CA, самоподписи |
 | Строгая цепочка X.509 | Linux, RFC 8448 + сгенерированные DER-фикстуры | DER/X.509/подписи/hostname/цепочка: 0 падений |
 | Токены тем | Linux, golden files | 2 эталона, 0 расхождений |
@@ -24,7 +25,7 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 426 tests` для `FptnCore` и `Executed 101 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+Последний прогон: `Executed 471 tests` для `FptnCore` и `Executed 101 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
 
 ## Проверка цепочки сертификатов
 
@@ -52,6 +53,36 @@
 - `CertificatePolicyWiringTests` сторожит проброс политики через
   `FPTNClientConfiguration` → `FPTNTunnelFactory` / `FPTNAPITransport` →
   `TLSConnectionConfiguration` → `TLSClientConfiguration`.
+
+## SPKI, отзыв и Certificate Transparency
+
+Дополнительные проверки оркестрируются `CertificateSecurityOptions` и
+применяются после основной политики (пинн, цепочка, системное доверие).
+Все они отключены по умолчанию и включаются конфигурацией.
+
+- **SPKI-pinning:** SHA-256 DER `SubjectPublicKeyInfo` листа, hex или base64,
+  constant-time сравнение. Пин можно задать в `FPTNClientConfiguration` или в
+  токене (`spki_sha256` у сервера); `addingSPKIPin` не дублирует значения.
+- **OCSP:** RFC 6960 `BasicOCSPResponse` — статус good/revoked/unknown,
+  `thisUpdate`/`nextUpdate`, серийный номер, подпись ответа (responder-сертификат
+  или издатель). Поддерживается stapling через TLS `status_request` (type 5)
+  и-response из конфигурации.
+- **CRL:** RFC 5280 `CertificateList` — издатель, окно действия, список
+  отозванных серийных номеров, подпись издателя. Из сертификата также
+  извлекаются `crlDistributionPoints` и OCSP-URI из AIA.
+- **SCT / CT:** RFC 6962 v1 — парсер TLS `SignedCertificateTimestampList`
+  (extension 18) и X.509 SCT extension, проверка подписи доверенным CT-логом,
+  времени выпуска и минимального числа валидных SCT.
+- Сетевых запросов во время handshake нет: сеть в этот момент уже туннелируется.
+  Данные об отзыве и список CT-логов предоставляет вызывающий код
+  (`RevocationPolicy`, `CTPolicy`), при `requireStatus` / `minimumValidSCTs`
+  отсутствие данных — fail-closed.
+
+Тесты: `CertificateSPKITests`, `CertificateRevocationTests`,
+`CertificateTransparencyTests`, `CertificateSecurityIntegrationTests` (SPKI-пин,
+stapled good/revoked OCSP и TLS SCT прямо в handshake), `X509CertificateTests`
+(серийный номер, CRL DP, AIA, встроенный SCT). Фикстуры CRL/OCSP/SCT
+подписываются одноразовым тестовым CA-ключом из `Tests/FptnCoreTests/Fixtures`.
 
 ## Системные корни
 
@@ -186,7 +217,7 @@ macOS-CI нашёл две ошибки, которые невозможно у�
    Регрессию проверяет `TunnelCallSiteTests`.
 
 Итоговый прогон (commit `1406acd`): оба job — `success`, **0 Swift-warning и
-0 Swift-error** в обоих логах; Linux — 527 тестов (426 + 101), macOS-job
+0 Swift-error** в обоих логах; Linux — 572 теста (471 + 101), macOS-job
 собрал app/extension c `_CryptoExtras`, скомпилировал `SystemTrust.swift`
 (`SecTrust`-путь для iOS), подтвердил type-check `TrafficChartView` и выполнил
 4 UI-теста рендеринга тем (`** TEST SUCCEEDED **`). Остаются только сторонние
@@ -251,10 +282,12 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   хуки записи, чтения, истории и отображения метрик/графика.
 - `DERTests`, `X509CertificateTests`, `CertificateChainTests`,
   `CertificateVerifyTests`, `StrictChainHandshakeTests`,
-  `CertificatePolicyWiringTests`, `X509PEMTests`, `SystemTrustTests`: DER,
+  `CertificatePolicyWiringTests`, `X509PEMTests`, `SystemTrustTests`,
+  `CertificateSPKITests`, `CertificateRevocationTests`,
+  `CertificateTransparencyTests`, `CertificateSecurityIntegrationTests`: DER,
   X.509 (RFC 8448 + RSA/ECDSA фикстуры), PEM, подписи, сроки, SAN/wildcard,
-  цепочка до якоря, системные корни, негативные сценарии, `CertificateVerify`
-  и проброс политики в продакшн-конфигурацию.
+  цепочка до якоря, системные корни, SPKI-пины, OCSP/CRL, SCT, негативные
+  сценарии, `CertificateVerify` и проброс политик в продакшн-конфигурацию.
 - `ThemeSnapshotTests`: golden-файлы обеих тем, полнота дампа, уникальность,
   диапазон компонентов, fallback, RU/EN названия, WCAG-контраст.
 - `ThemeIntegrationTests`: палитра-адаптер без цветовых литералов, отсутствие
@@ -284,7 +317,8 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
 - Все 19 серверов и длительная работа pool под нагрузкой; live-прогон покрывает по одному серверу на режим.
 - `.systemTrust` на реальном iOS-устройстве с публичным сертификатом:
   симуляторный CI проверяет только сборку `SecTrust`-кода.
-- OCSP/CRL/SCT и проверка отзыва сертификатов.
+- Сетевая загрузка OCSP/CRL и встроенный список доверенных CT-логов:
+  данные и логи передаёт вызывающий код, handshake сеть не использует.
 - iOS route installation и `NEPacketTunnelFlow` на устройстве.
 - Метрики трафика и график в живом туннеле: запись снимков из extension,
   чтение в app, корректность скоростей при смене сети и реконнекте,

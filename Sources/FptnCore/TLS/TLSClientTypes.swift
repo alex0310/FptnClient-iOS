@@ -6,18 +6,21 @@ public struct TLSClientConfiguration: Sendable {
     public let expectedCertificateMD5: String?
     public let maxHandshakeSize: Int
     public let certificatePolicy: CertificateValidationPolicy
+    public let certificateSecurity: CertificateSecurityOptions
 
     public init(
         serverName: String,
         cipherSuites: [TLSCipherSuite] = TLSCipherSuite.allCases,
         expectedCertificateMD5: String? = nil,
         maxHandshakeSize: Int = 1 << 20,
-        certificatePolicy: CertificateValidationPolicy? = nil
+        certificatePolicy: CertificateValidationPolicy? = nil,
+        certificateSecurity: CertificateSecurityOptions = .default
     ) {
         self.serverName = serverName
         self.cipherSuites = cipherSuites
         self.expectedCertificateMD5 = expectedCertificateMD5
         self.maxHandshakeSize = maxHandshakeSize
+        self.certificateSecurity = certificateSecurity
         // An MD5 pin when the token supplies one; otherwise validate against
         // the OS trust store instead of silently trusting the server.
         if let certificatePolicy {

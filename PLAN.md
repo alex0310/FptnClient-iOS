@@ -21,7 +21,7 @@
 - [x] `FPTNClient`, `FPTNRelay`.
 - [x] iOS SwiftUI app с темами Aurora/Ember.
 - [x] NetworkExtension skeleton.
-- [x] Linux tests: 527 (426 core + 101 shared), 0 падений, 0 warnings.
+- [x] Linux tests: 572 (471 core + 101 shared), 0 падений, 0 warnings.
 - [x] Linux live probe: login/DNS/tunnel/DNS через туннель, plain/obfuscated/reality.
 - [x] Проверить на реальном FPTN-сервере все три режима маскировки (`Tools/LiveProbe`).
 - [x] Публичный репозиторий `alex0310/FptnClient-iOS` и CI на GitHub Actions (Ubuntu + macOS-раннер).
@@ -39,6 +39,10 @@
 - [x] Системные корни для строгого режима: `.systemTrust` использует `SecTrust`
   на iOS и PEM-бандл ОС на Linux; CA bundle в репозиторий не вендорится.
   Соединения без MD5-пинна по умолчанию идут через системное доверие.
+- [x] SPKI-pinning (SHA-256 SubjectPublicKeyInfo, hex/base64, поле `spki_sha256`
+  в токене), OCSP (в т.ч. stapling), CRL и SCT/Certificate Transparency:
+  парсеры DER, проверка подписей, сроков, серийных номеров, доверенных
+  CT-логов и минимального числа валидных SCT.
 - [x] Swift 6 language mode для всего пакета: 0 warnings, все тесты проходят.
 
 ## Следующие шаги
@@ -49,6 +53,9 @@
 - [ ] Проверить метрики трафика и график в живом туннеле на устройстве.
 - [ ] Проверить `.systemTrust` на реальном iOS-устройстве с публичным
   сертификатом (симуляторный CI проверяет только сборку).
+- [ ] Сетевая загрузка OCSP/CRL и встроенный список доверенных CT-логов
+  (сейчас данные и логи передаёт вызывающий код, без обращений к сети из
+  handshake).
 
 ## Открытые вопросы
 

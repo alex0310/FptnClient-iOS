@@ -67,4 +67,27 @@ final class X509CertificateTests: XCTestCase {
         let leaf = try X509Certificate(der: CertificateFixtures.der("rsa-leaf"))
         XCTAssertTrue(leaf.supportsServerAuthentication)
     }
+
+    func testParsesSerialNumberAndRevocationEndpoints() throws {
+        let certificate = try X509Certificate(
+            der: CertificateFixtures.der("rsa-leaf-ext")
+        )
+        XCTAssertFalse(certificate.serialNumber.isEmpty)
+        XCTAssertEqual(
+            certificate.crlDistributionPoints,
+            ["http://crl.example.com/root.crl"]
+        )
+        XCTAssertEqual(certificate.ocspURLs, ["http://ocsp.example.com"])
+    }
+
+    func testParsesEmbeddedSCTList() throws {
+        let certificate = try X509Certificate(
+            der: CertificateFixtures.der("rsa-leaf-ext")
+        )
+        let list = try XCTUnwrap(certificate.embeddedSCTList)
+        XCTAssertEqual(try SCTList.parse(list).count, 1)
+        XCTAssertTrue(
+            certificate.extensionOIDs.contains(X509OID.signedCertificateTimestamp)
+        )
+    }
 }
