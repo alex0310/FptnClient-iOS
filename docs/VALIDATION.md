@@ -4,7 +4,8 @@
 
 | Компонент | Среда | Результат |
 |---|---|---|
-| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 511 тестов (410 + 101), 0 падений |
+| `FptnCore` + `FptnShared` | Linux x86_64, Swift 6.4.2, **Swift 6 language mode** | 527 тестов (426 + 101), 0 падений |
+| Системные корни | Linux, OS PEM bundle / iOS `SecTrust` | загрузка, разбор, CA, самоподписи |
 | Строгая цепочка X.509 | Linux, RFC 8448 + сгенерированные DER-фикстуры | DER/X.509/подписи/hostname/цепочка: 0 падений |
 | Токены тем | Linux, golden files | 2 эталона, 0 расхождений |
 | UI-рендеринг тем | `macos-15`, iPhone 16 / iOS 26.2, `xcodebuild test` | 4 теста, 0 падений |
@@ -23,7 +24,7 @@
 /home/vasek/opt/swift-6.4.2/usr/bin/swift test --package-path /home/vasek/FptnClient-iOS
 ```
 
-Последний прогон: `Executed 410 tests` для `FptnCore` и `Executed 101 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
+Последний прогон: `Executed 426 tests` для `FptnCore` и `Executed 101 tests` для `FptnShared`, с 0 failures. `swift build` также завершается без warnings и errors, в том числе с `-Xswiftc -warnings-as-errors`.
 
 ## Проверка цепочки сертификатов
 
@@ -52,8 +53,31 @@
   `FPTNClientConfiguration` → `FPTNTunnelFactory` / `FPTNAPITransport` →
   `TLSConnectionConfiguration` → `TLSClientConfiguration`.
 
-Публичный CA bundle в репозиторий не входит: в строгом режиме корни задаются
-явно, пустой набор — fail-closed.
+## Системные корни
+
+Вендоринга CA bundle нет: статическая копия быстро устаревает и тянет
+стороннюю лицензию. Вместо этого `CertificateValidationPolicy.systemTrust`
+использует доверие операционной системы:
+
+- **Apple (`#if canImport(Security)`)** — `SecTrustCreateWithCertificates` +
+  `SecPolicyCreateSSL` + `SecTrustEvaluateWithError`; iOS не даёт перечислить
+  системные якоря, поэтому решение о доверии принимает сам `SecTrust`.
+- **Linux/прочие** — `X509PEM` разбирает системный PEM-бандл
+  (`/etc/ssl/certs/ca-certificates.crt` и альтернативные пути), якоря
+  кэшируются один раз на процесс; дальше работает тот же чистый Swift
+  валидатор цепочки.
+- Явный набор якорей (`systemAnchors:`) всегда имеет приоритет — это делает
+  путь детерминированным для тестов и позволяет встроить собственные корни.
+- Если системный бандл недоступен, `.systemTrust` падает с
+  `CertificateChainError.noTrustAnchor` (fail-closed).
+- Политика по умолчанию: при наличии `md5_fingerprint` — `.pinnedMD5`, при
+  его отсутствии — `.systemTrust` (раньше это был молчаливый пропуск, позже
+  жёсткий отказ).
+
+Тесты: `X509PEMTests` (LF/CRLF, комментарии, несколько сертификатов, битые
+маркеры/base64), `SystemTrustTests` (загрузка из внедрённого PEM, OS-бандл,
+`.systemTrust` с якорями/без якорей, дефолты политики), guard-тест на
+наличие `SecTrust`-кода и проброс `.systemTrust`.
 
 ## Тесты тем
 
@@ -162,7 +186,7 @@ macOS-CI нашёл две ошибки, которые невозможно у�
    Регрессию проверяет `TunnelCallSiteTests`.
 
 Итоговый прогон (commit `d709441`): оба job — `success`, **0 Swift-warning и
-0 Swift-error** в обоих логах; Linux — 511 тестов (410 + 101), macOS-job
+0 Swift-error** в обоих логах; Linux — 527 тестов (426 + 101), macOS-job
 собрал app/extension с новой зависимостью `_CryptoExtras`, подтвердил
 type-check `TrafficChartView` и выполнил 4 UI-теста рендеринга тем
 (`** TEST SUCCEEDED **`). Остаются только сторонние предупреждения
@@ -226,9 +250,10 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   хуки записи, чтения, истории и отображения метрик/графика.
 - `DERTests`, `X509CertificateTests`, `CertificateChainTests`,
   `CertificateVerifyTests`, `StrictChainHandshakeTests`,
-  `CertificatePolicyWiringTests`: DER, X.509 (RFC 8448 + RSA/ECDSA фикстуры),
-  подписи, сроки, SAN/wildcard, цепочка до якоря, негативные сценарии,
-  `CertificateVerify` и проброс политики в продакшн-конфигурацию.
+  `CertificatePolicyWiringTests`, `X509PEMTests`, `SystemTrustTests`: DER,
+  X.509 (RFC 8448 + RSA/ECDSA фикстуры), PEM, подписи, сроки, SAN/wildcard,
+  цепочка до якоря, системные корни, негативные сценарии, `CertificateVerify`
+  и проброс политики в продакшн-конфигурацию.
 - `ThemeSnapshotTests`: golden-файлы обеих тем, полнота дампа, уникальность,
   диапазон компонентов, fallback, RU/EN названия, WCAG-контраст.
 - `ThemeIntegrationTests`: палитра-адаптер без цветовых литералов, отсутствие
@@ -256,9 +281,8 @@ FPTN_LIVE_TOKEN_FILE=/path/to/fptn-token \
   Вместо этого golden-файлы фиксируют точные значения токенов, а Xcode-тесты —
   непустой рендер и различие тем. Тема UI/snapshot-тестов считается закрытой.
 - Все 19 серверов и длительная работа pool под нагрузкой; live-прогон покрывает по одному серверу на режим.
-- Встроенный публичный CA bundle и системные корни iOS: строгий режим требует
-  явных якорей; поведение с реальными публичными сертификатами на устройстве
-  не проверялось.
+- `.systemTrust` на реальном iOS-устройстве с публичным сертификатом:
+  симуляторный CI проверяет только сборку `SecTrust`-кода.
 - OCSP/CRL/SCT и проверка отзыва сертификатов.
 - iOS route installation и `NEPacketTunnelFlow` на устройстве.
 - Метрики трафика и график в живом туннеле: запись снимков из extension,

@@ -49,12 +49,15 @@ public struct X509TrustAnchors: Equatable, Sendable {
 }
 
 /// How the TLS client authenticates the server.
-public enum CertificateValidationPolicy: Sendable {
+public enum CertificateValidationPolicy: Equatable, Sendable {
     /// Upstream FPTN behaviour: compare the MD5 of the leaf DER against the
     /// token's fingerprint. `nil` is rejected rather than silently trusted.
     case pinnedMD5(String?)
     /// Full X.509 path validation plus TLS `CertificateVerify` signature check.
     case strictChain(X509TrustAnchors)
+    /// Use the OS trust store (`SecTrust` on Apple, the system PEM bundle on
+    /// other platforms). This is the default when a token has no MD5 pin.
+    case systemTrust
 }
 
 public enum CertificateHostname {
@@ -147,7 +150,7 @@ public enum CertificateChainValidator {
         return leaf
     }
 
-    private static func checkLeaf(_ leaf: X509Certificate, now: Date) throws {
+    static func checkLeaf(_ leaf: X509Certificate, now: Date) throws {
         try checkValidity(leaf, now: now)
         guard leaf.supportsServerAuthentication else {
             throw CertificateChainError.missingServerAuthEKU
@@ -180,7 +183,8 @@ public enum CertificateAuthenticator {
         chainDER: [[UInt8]],
         hostname: String,
         policy: CertificateValidationPolicy,
-        now: Date = Date()
+        now: Date = Date(),
+        systemAnchors: X509TrustAnchors? = nil
     ) throws -> X509Certificate? {
         switch policy {
         case let .pinnedMD5(fingerprint):
@@ -194,6 +198,63 @@ public enum CertificateAuthenticator {
                 anchors: anchors,
                 now: now
             )
+        case .systemTrust:
+            return try verifySystemTrust(
+                chainDER: chainDER,
+                hostname: hostname,
+                now: now,
+                systemAnchors: systemAnchors
+            )
         }
+    }
+
+    private static func verifySystemTrust(
+        chainDER: [[UInt8]],
+        hostname: String,
+        now: Date,
+        systemAnchors: X509TrustAnchors?
+    ) throws -> X509Certificate {
+        guard !chainDER.isEmpty else { throw CertificateChainError.emptyChain }
+        let chain: [X509Certificate]
+        do {
+            chain = try chainDER.map { try X509Certificate(der: $0) }
+        } catch {
+            throw CertificateChainError.malformedCertificate
+        }
+        let leaf = chain[0]
+        guard CertificateHostname.matches(leaf, hostname: hostname) else {
+            throw CertificateChainError.hostnameMismatch(
+                expected: hostname,
+                present: leaf.dnsNames.isEmpty ? [leaf.commonName ?? ""] : leaf.dnsNames
+            )
+        }
+        try CertificateChainValidator.checkLeaf(leaf, now: now)
+
+        // An explicit anchor set always wins: it keeps the pure-Swift path
+        // deterministic for tests and for callers that embed their own roots.
+        if let systemAnchors {
+            guard !systemAnchors.isEmpty else { throw CertificateChainError.noTrustAnchor }
+            return try CertificateChainValidator.validate(
+                chainDER: chainDER,
+                hostname: hostname,
+                anchors: systemAnchors,
+                now: now
+            )
+        }
+        #if canImport(Security)
+        guard SystemTrustEvaluator.evaluate(chainDER: chainDER, hostname: hostname) else {
+            throw CertificateChainError.untrustedRoot
+        }
+        return leaf
+        #else
+        let anchors = SystemTrustAnchors.shared
+        guard !anchors.isEmpty else { throw CertificateChainError.noTrustAnchor }
+        return try CertificateChainValidator.validate(
+            chainDER: chainDER,
+            hostname: hostname,
+            anchors: anchors,
+            now: now
+        )
+        #endif
     }
 }

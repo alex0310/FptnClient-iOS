@@ -18,9 +18,15 @@ public struct TLSClientConfiguration: Sendable {
         self.cipherSuites = cipherSuites
         self.expectedCertificateMD5 = expectedCertificateMD5
         self.maxHandshakeSize = maxHandshakeSize
-        // Backwards compatible default: an MD5 pin when the token supplies
-        // one, otherwise no silent trust (the pinner fails closed).
-        self.certificatePolicy = certificatePolicy ?? .pinnedMD5(expectedCertificateMD5)
+        // An MD5 pin when the token supplies one; otherwise validate against
+        // the OS trust store instead of silently trusting the server.
+        if let certificatePolicy {
+            self.certificatePolicy = certificatePolicy
+        } else if let expectedCertificateMD5 {
+            self.certificatePolicy = .pinnedMD5(expectedCertificateMD5)
+        } else {
+            self.certificatePolicy = .systemTrust
+        }
     }
 }
 

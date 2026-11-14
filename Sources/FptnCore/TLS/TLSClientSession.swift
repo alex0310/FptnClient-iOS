@@ -342,10 +342,13 @@ public final class TLSClientSession {
         guard !signature.isEmpty, reader.isAtEnd else {
             throw TLSError.unexpectedMessage("malformed CertificateVerify")
         }
-        guard case .strictChain = policy else {
+        switch policy {
+        case .pinnedMD5:
             // Upstream FPTN behaviour: the MD5 pin plus TLS Finished are the
             // only authentication when strict X.509 validation is disabled.
             return
+        case .strictChain, .systemTrust:
+            break
         }
         guard let leaf = leafCertificate,
               let hash = keySchedule?.transcriptHash(),

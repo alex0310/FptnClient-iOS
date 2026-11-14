@@ -151,8 +151,10 @@ u8 message_type | поля
   `CertificateVerify` здесь не верифицируется (паритет с upstream C++).
 - Политика `.strictChain` дополнительно строит и проверяет цепочку X.509 до
   явно заданного корня (сроки, SAN/hostname, CA/EKU, подписи RSA/ECDSA) и
-  верифицирует `CertificateVerify` публичным ключом листа. Подробности — в
-  `SECURITY.md`.
+  верифицирует `CertificateVerify` публичным ключом листа.
+- Политика `.systemTrust` (по умолчанию, если пинна нет) использует корни ОС:
+  `SecTrust` на iOS и системный PEM-бандл на Linux, плюс те же проверки листа.
+  Подробности — в `SECURITY.md`.
 
 ### FPTN session key
 
