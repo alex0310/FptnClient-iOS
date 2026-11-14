@@ -185,14 +185,15 @@ macOS-CI нашёл две ошибки, которые невозможно у�
    `TunnelRuntime.start` принимает `completion:`, а не `completionHandler:`.
    Регрессию проверяет `TunnelCallSiteTests`.
 
-Итоговый прогон (commit `d709441`): оба job — `success`, **0 Swift-warning и
+Итоговый прогон (commit `1406acd`): оба job — `success`, **0 Swift-warning и
 0 Swift-error** в обоих логах; Linux — 527 тестов (426 + 101), macOS-job
-собрал app/extension с новой зависимостью `_CryptoExtras`, подтвердил
-type-check `TrafficChartView` и выполнил 4 UI-теста рендеринга тем
-(`** TEST SUCCEEDED **`). Остаются только сторонние предупреждения
-инструментов: `gpg` при установке Swift, `appintentsmetadataprocessor` Xcode
-(нет зависимости от `AppIntents.framework`) и уведомление runner о Node.js 20.
-Прогон: https://github.com/alex0310/FptnClient-iOS/actions/runs/43562239724
+собрал app/extension c `_CryptoExtras`, скомпилировал `SystemTrust.swift`
+(`SecTrust`-путь для iOS), подтвердил type-check `TrafficChartView` и выполнил
+4 UI-теста рендеринга тем (`** TEST SUCCEEDED **`). Остаются только сторонние
+предупреждения инструментов: `gpg` при установке Swift,
+`appintentsmetadataprocessor` Xcode (нет зависимости от `AppIntents.framework`)
+и уведомление runner о Node.js 20.
+Прогон: https://github.com/alex0310/FptnClient-iOS/actions/runs/43581023113
 
 ## Живая проверка FPTN
 
